@@ -781,3 +781,4 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
 elif secim == "📂 Dosya": sayfa_dosya()
+
