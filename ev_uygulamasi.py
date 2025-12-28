@@ -16,7 +16,7 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Ev Asistanı Pro", page_icon="🏠", layout="centered")
 
 # ==============================================================================
-# ARKA PLAN İŞÇİLERİ (GÜÇLENDİRİLMİŞ SİLME)
+# ARKA PLAN İŞÇİLERİ
 # ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -33,46 +33,42 @@ def arka_planda_ekle(satir_verisi):
     except: pass
 
 def arka_planda_sil(urun_adi):
-    """TERMİNATÖR MODU: İsmi bulamazsa satırları tek tek gezer bulur ve siler"""
     try:
         client = get_client()
         sheet = client.open(DOSYA_ADI).sheet1
-        
-        # Yöntem 1: Klasik Arama
+        # Kesin Silme (Terminatör Modu)
         try:
             cell = sheet.find(urun_adi)
             sheet.delete_rows(cell.row)
-            return # Başarılıysa çık
-        except:
-            pass # Bulamadıysa Yöntem 2'ye geç
-
-        # Yöntem 2: Manuel Tarama (Kesin Çözüm)
-        tum_veriler = sheet.get_all_values()
-        for i, row in enumerate(tum_veriler):
-            # row[0] -> Urun Sütunu
-            if row[0] == urun_adi:
-                # i+1 çünkü Google Sheets 1'den başlar
-                sheet.delete_rows(i + 1)
-                break 
-
-    except Exception as e:
-        print(f"Silme hatası: {e}")
-
-def arka_planda_guncelle(urun_adi, yeni_durum):
-    try:
-        client = get_client()
-        sheet = client.open(DOSYA_ADI).sheet1
-        # Burada da sağlamlaştırma yapalım
-        try:
-            cell = sheet.find(urun_adi)
-            sheet.update_cell(cell.row, 2, str(yeni_durum))
         except:
             # Bulamazsa manuel ara
             tum_veriler = sheet.get_all_values()
             for i, row in enumerate(tum_veriler):
                 if row[0] == urun_adi:
+                    sheet.delete_rows(i + 1)
+                    break 
+    except: pass
+
+def arka_planda_guncelle(urun_adi, yeni_durum):
+    try:
+        client = get_client()
+        sheet = client.open(DOSYA_ADI).sheet1
+        try:
+            cell = sheet.find(urun_adi)
+            sheet.update_cell(cell.row, 2, str(yeni_durum))
+        except:
+            tum_veriler = sheet.get_all_values()
+            for i, row in enumerate(tum_veriler):
+                if row[0] == urun_adi:
                     sheet.update_cell(i + 1, 2, str(yeni_durum))
                     break
+    except: pass
+
+def bildirim_gonder(mesaj):
+    try:
+        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
+                      data=mesaj.encode('utf-8'),
+                      headers={"Title": "Ev Asistanı".encode('utf-8'), "Priority": "high"})
     except: pass
 
 # ==============================================================================
@@ -105,11 +101,35 @@ if 'local_df' not in st.session_state:
     st.session_state.local_df = verileri_yukle()
 
 # ==============================================================================
+# OTOMATİK KONTROL (ÖDEME BİLDİRİMİ)
+# ==============================================================================
+def odeme_kontrolu_yap():
+    """Bugün ödemesi olan var mı bakar ve bildirim atar"""
+    if 'odeme_kontrol_yapildi' not in st.session_state:
+        df = st.session_state.local_df
+        odeme_listesi = df[df["Tip"] == "FATURA"]
+        bugun_gun = datetime.now().day
+        
+        for index, row in odeme_listesi.iterrows():
+            try:
+                odeme_gunu = int(float(row["Zaman"])) # Bazen string "15.0" gelebilir
+                if odeme_gunu == bugun_gun:
+                    bildirim_gonder(f"💸 ÖDEME GÜNÜ: {row['Urun']} ödemesini unutma!")
+            except: pass
+        
+        st.session_state.odeme_kontrol_yapildi = True
+
+# Uygulama her açıldığında/yenilendiğinde kontrol et
+odeme_kontrolu_yap()
+
+# ==============================================================================
 # HIZLI İŞLEM FONKSİYONLARI
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
+    # RAM Ekleme
     yeni_satir = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
+    # Google Ekleme
     t = threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],))
     t.start()
 
@@ -125,11 +145,20 @@ def hizli_durum_degistir(isim, yeni_durum):
     t = threading.Thread(target=arka_planda_guncelle, args=(isim, yeni_durum))
     t.start()
 
-# CALLBACKLER
+# CALLBACKLER (VİRGÜL AYIRMA BURADA)
 def ekleme_callback(input_key, tip):
     val = st.session_state[input_key]
     if val:
-        hizli_ekle(val, tip)
+        # VİRGÜL VARSA PARÇALA
+        if "," in val:
+            parcalar = val.split(",")
+            for p in parcalar:
+                temiz_isim = p.strip() # Boşlukları temizle
+                if temiz_isim:
+                    hizli_ekle(temiz_isim, tip)
+        else:
+            hizli_ekle(val, tip)
+            
         st.session_state[input_key] = ""
 
 def fatura_callback():
@@ -137,19 +166,22 @@ def fatura_callback():
     gun = st.session_state.fat_gun
     saat = st.session_state.fat_saat
     tekrar = st.session_state.fat_tekrar
-    
     if ad:
         tekrar_kod = "HER_AY" if tekrar == "🔁 Her Ay" else "TEK"
         saat_str = str(saat)[0:5]
         hizli_ekle(isim=ad, tip="FATURA", zaman=gun, mesaj=saat_str, durum=tekrar_kod)
         st.session_state.fat_ad = ""
 
-def bildirim_gonder(mesaj):
-    try:
-        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
-                      data=mesaj.encode('utf-8'),
-                      headers={"Title": "Ev Asistanı".encode('utf-8'), "Priority": "high"})
-    except: pass
+def butce_callback():
+    ad = st.session_state.butce_ad
+    tutar = st.session_state.butce_tutar
+    tur = st.session_state.butce_tur # Gelir / Gider
+    
+    if ad and tutar > 0:
+        # Bütçe için: Mesaj=Tutar, Durum=Gelir/Gider
+        hizli_ekle(isim=ad, tip="BUTCE", mesaj=str(tutar), durum=tur)
+        st.session_state.butce_ad = ""
+        st.session_state.butce_tutar = 0
 
 def alarm_kur(mesaj, sure):
     hedef = datetime.now() + timedelta(minutes=sure)
@@ -159,7 +191,7 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM BİLEŞENLERİ (GÜVENLİ SİLME BUTONU)
+# GÖRÜNÜM BİLEŞENLERİ
 # ==============================================================================
 def silme_butonu_koy(key_prefix, urun_adi):
     sil_key = f"del_{key_prefix}_{urun_adi}"
@@ -218,12 +250,11 @@ def fatura_listesi_goster():
     df = st.session_state.local_df
     df_fatura = df[df["Tip"] == "FATURA"]
     if df_fatura.empty:
-        st.info("Henüz ödeme eklenmedi.")
+        st.info("Ödeme yok.")
         return
 
     st.subheader("🗓️ Ödeme Takvimi")
     bugun = datetime.now().day
-    
     df_fatura["Gun_Sayi"] = pd.to_numeric(df_fatura["Zaman"], errors='coerce').fillna(32)
     df_fatura = df_fatura.sort_values("Gun_Sayi")
 
@@ -249,10 +280,51 @@ def fatura_listesi_goster():
             st.divider()
         except: pass
 
+def butce_goster():
+    df = st.session_state.local_df
+    df_butce = df[df["Tip"] == "BUTCE"]
+    
+    # Hesaplama
+    toplam_gelir = 0
+    toplam_gider = 0
+    
+    if not df_butce.empty:
+        for index, row in df_butce.iterrows():
+            try:
+                tutar = float(row["Mesaj"])
+                if row["Durum"] == "Gelir":
+                    toplam_gelir += tutar
+                else:
+                    toplam_gider += tutar
+            except: pass
+
+    kalan = toplam_gelir - toplam_gider
+
+    # Özet Kartları
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Toplam Gelir", f"{toplam_gelir} ₺", delta_color="normal")
+    c2.metric("Toplam Gider", f"{toplam_gider} ₺", delta_color="inverse")
+    c3.metric("Kalan", f"{kalan} ₺", delta=kalan, delta_color="normal")
+
+    st.divider()
+    
+    # Liste
+    if not df_butce.empty:
+        st.subheader("📋 Hareketler")
+        for index, row in df_butce.iterrows():
+            c1, c2, c3 = st.columns([3, 2, 1])
+            with c1:
+                renk = "🟢" if row["Durum"] == "Gelir" else "🔴"
+                st.write(f"{renk} **{row['Urun']}**")
+            with c2:
+                st.write(f"{row['Mesaj']} ₺")
+            with c3:
+                silme_butonu_koy(f"butce_{index}", row['Urun'])
+            st.divider()
+
 def alarm_listesi_goster():
     df = st.session_state.local_df
     df_alarm = df[df["Tip"] == "ALARM"]
-    
     if df_alarm.empty: return
 
     st.markdown("---")
@@ -272,15 +344,9 @@ def alarm_listesi_goster():
             with c2:
                 if toplam_saniye > 0:
                     dakika = int(toplam_saniye / 60)
-                    saniye = int(toplam_saniye % 60)
-                    if dakika > 60:
-                        saat = int(dakika / 60)
-                        dk = dakika % 60
-                        st.info(f"⏳ {saat} sa {dk} dk")
-                    else:
-                        st.info(f"⏳ {dakika} dk {saniye} sn")
+                    st.info(f"⏳ {dakika} dk")
                 else:
-                    st.error("🔔 SÜRE DOLDU")
+                    st.error("🔔 DOLDU")
             with c3:
                 silme_butonu_koy(f"alarm_{index}", row['Urun'])
             st.divider()
@@ -295,12 +361,12 @@ if st.button("🔄 Verileri Yenile", use_container_width=True):
     st.session_state.local_df = verileri_yukle()
     st.rerun()
 
-tab1, tab2, tab3, tab4 = st.tabs(["🛒 MARKET", "📝 İŞLER", "💸 ÖDEMELER", "⏰ ALARM"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🛒 MARKET", "📝 İŞLER", "💸 ÖDEMELER", "💰 BÜTÇE", "⏰ ALARM"])
 
 with tab1:
     c1, c2 = st.columns([3, 1])
     with c1:
-        st.text_input("Market", placeholder="Ürün...", label_visibility="collapsed", key="market_giris")
+        st.text_input("Market (Virgülle ayırabilirsin)", placeholder="Süt, Ekmek, Yumurta...", label_visibility="collapsed", key="market_giris")
     with c2:
         st.button("EKLE", key="btn_m", on_click=ekleme_callback, args=("market_giris", "MARKET"), use_container_width=True)
     st.markdown("---")
@@ -309,7 +375,7 @@ with tab1:
 with tab2:
     c1, c2 = st.columns([3, 1])
     with c1:
-        st.text_input("Görev", placeholder="İş...", label_visibility="collapsed", key="is_giris")
+        st.text_input("Görev (Virgülle ayırabilirsin)", placeholder="Fatura, Araba...", label_visibility="collapsed", key="is_giris")
     with c2:
         st.button("EKLE", key="btn_t", on_click=ekleme_callback, args=("is_giris", "TODO"), use_container_width=True)
     st.markdown("---")
@@ -319,24 +385,36 @@ with tab3:
     with st.expander("➕ Yeni Ödeme Ekle", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
-            st.text_input("Ödeme Adı", placeholder="Kira, Netflix...", key="fat_ad")
+            st.text_input("Ödeme Adı", placeholder="Kira...", key="fat_ad")
             st.number_input("Ayın Günü", min_value=1, max_value=31, value=1, key="fat_gun")
         with c2:
-            st.time_input("Hatırlatma Saati", value=dt_time(9, 0), key="fat_saat")
+            st.time_input("Saat", value=dt_time(9, 0), key="fat_saat")
             st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek Seferlik"], key="fat_tekrar")
         st.button("KAYDET", key="btn_f", on_click=fatura_callback, use_container_width=True)
     st.markdown("---")
     fatura_listesi_goster()
 
 with tab4:
-    st.info("Alarmlar hem telefonuna bildirim atar hem de aşağıda geri sayım yapar.")
+    with st.expander("➕ Gelir / Gider Ekle", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.radio("Tür", ["Gider", "Gelir"], horizontal=True, key="butce_tur")
+            st.text_input("Açıklama", placeholder="Maaş, Market...", key="butce_ad")
+        with c2:
+            st.number_input("Tutar (TL)", min_value=0, value=0, key="butce_tutar")
+            st.write("") # Boşluk
+            st.write("")
+            st.button("KAYDET", key="btn_b", on_click=butce_callback, use_container_width=True)
+    st.markdown("---")
+    butce_goster()
+
+with tab5:
     with st.form("alarm"):
-        mesaj = st.text_input("Not", placeholder="Fırın, Kombi...")
+        mesaj = st.text_input("Not", placeholder="Fırın...")
         sure = st.number_input("Dakika", min_value=1, value=15)
         if st.form_submit_button("🔔 Kur", use_container_width=True):
             alarm_kur(mesaj, sure)
             st.success("Kuruldu!")
             time.sleep(1)
             st.rerun()
-            
     alarm_listesi_goster()
