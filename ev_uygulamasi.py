@@ -29,30 +29,21 @@ st.markdown("""
     }
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; opacity: 0.95; }
-    .link-box {
-        text-decoration: none; color: #333; background: #f0f2f6; padding: 8px;
-        border-radius: 5px; display: block; margin-bottom: 5px;
-        text-align: center; font-weight: bold; border: 1px solid #ddd;
+    .category-header {
+        font-size: 16px; font-weight: bold; color: #444; 
+        border-bottom: 2px solid #eee; margin-top: 10px; margin-bottom: 5px; padding-bottom: 2px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# AI MUTFAK ŞEFİ MOTORU (GELİŞMİŞ)
+# AI MUTFAK ŞEFİ MOTORU
 # ==============================================================================
 def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
-    # Verileri birleştir ve küçük harfe çevir (Eşleşme kolay olsun diye)
     tum_malzemeler = set()
-    
-    # Marketten gelenleri temizle (Örn: "Yumurta (10lu)" -> "yumurta")
-    for urun in marketten_gelenler:
-        temiz_ad = urun.lower().split("(")[0].strip()
-        tum_malzemeler.add(temiz_ad)
-        
-    for urun in manuel_eklenenler:
-        tum_malzemeler.add(urun.lower())
+    for urun in marketten_gelenler: tum_malzemeler.add(urun.lower().split("(")[0].strip())
+    for urun in manuel_eklenenler: tum_malzemeler.add(urun.lower())
 
-    # Tarif Veritabanı (Hepsi küçük harf olmalı)
     tarifler = {
         "Menemen": ["yumurta", "domates", "biber"],
         "Omlet": ["yumurta", "peynir", "tereyağı"],
@@ -70,24 +61,11 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
         "Hamburger": ["kıyma", "ekmek", "domates", "yeşillik"]
     }
     
-    tam_liste = []
-    eksik_liste = []
-    
+    tam_liste, eksik_liste = [], []
     for yemek, malzemeler in tarifler.items():
-        # Eşleşme Kontrolü (İçeriyor mu?)
-        eksikler = []
-        for m in malzemeler:
-            # Malzeme adının herhangi bir parçası envanterde var mı?
-            # Örn: Envanterde "Domatesli sos" varsa, "domates" ihtiyacını karşılamaz ama tersi olur.
-            # Basit eşleşme:
-            if m not in tum_malzemeler:
-                eksikler.append(m)
-        
-        if len(eksikler) == 0:
-            tam_liste.append(yemek)
-        elif len(eksikler) <= 2:
-            eksik_liste.append((yemek, eksikler))
-            
+        eksikler = [m for m in malzemeler if m not in tum_malzemeler]
+        if len(eksikler) == 0: tam_liste.append(yemek)
+        elif len(eksikler) <= 2: eksik_liste.append((yemek, eksikler))
     return tam_liste, eksik_liste, list(tum_malzemeler)
 
 # ==============================================================================
@@ -97,9 +75,9 @@ def karsilama_paneli():
     saat = datetime.now().hour
     selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
     sozler = [
-        "🏡 Evimiz, huzurumuzdur.", "💡 Bütçeni kontrol et, rahat et.",
-        "🐈 Prenses'i sevdiniz mi?", "❤️ Birbirinize zaman ayırın.",
-        "🛒 Alışveriş listesine baktın mı?", "👨‍🍳 Şef, market listeni biliyor!"
+        "🏡 Evimiz, kalemizdir.", "💡 Kategorileri kullanarak marketi daha hızlı gezebilirsin.",
+        "🐈 Prenses'i sevdiniz mi?", "❤️ Birlikte film izlemek için harika bir gün.",
+        "🛒 Eksikleri kategorisine göre eklersen karışıklık olmaz.", "👨‍🍳 Şef bugün ne öneriyor?"
     ]
     st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
 
@@ -200,6 +178,14 @@ def ekleme_callback(key, tip):
         else: hizli_ekle(val, tip)
         st.session_state[key] = ""
 
+def market_ekleme_callback():
+    val = st.session_state.market_giris
+    kat = st.session_state.market_kategori
+    if val:
+        # Kategoriyi MESAJ sütununa kaydediyoruz
+        hizli_ekle(val, "MARKET", mesaj=kat)
+        st.session_state.market_giris = ""
+
 def not_callback():
     baslik, icerik = st.session_state.not_baslik, st.session_state.not_icerik
     if baslik and icerik:
@@ -249,22 +235,47 @@ def silme_butonu_koy(prefix, urun):
 # ==============================================================================
 def sayfa_ana_ekran():
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
+    
     with tab1:
-        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Market", key="market_giris", label_visibility="collapsed")
-        with c2: st.button("EKLE", key="btn_m", on_click=ekleme_callback, args=("market_giris", "MARKET"), use_container_width=True)
+        # KATEGORİ SEÇİMİ
+        KATEGORILER = ["Genel", "🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt & Kahvaltılık", "🍞 Gıda & Bakliyat", "🧹 Temizlik & Ev", "🍫 Atıştırmalık"]
+        
+        c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="bottom")
+        with c1: st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün...")
+        with c2: st.selectbox("Kategori", KATEGORILER, key="market_kategori", label_visibility="collapsed")
+        with c3: st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
         st.markdown("---")
+        
         df = st.session_state.local_df
-        alinacaklar = df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")]
-        tamamlananlar = df[(df["Tip"] == "MARKET") & (df["Durum"] == "1")]
-        if alinacaklar.empty: st.success("Sepet Boş!")
-        for i, row in alinacaklar.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-            with c1:
-                if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-            with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
+        mask = (df["Tip"] == "MARKET")
+        df_market = df[mask]
+        
+        alinacaklar = df_market[df_market["Durum"] == "0"]
+        
+        if alinacaklar.empty: st.success("Sepet Boş! 🎉")
+        
+        # GRUPLU LİSTELEME
+        # Mevcut kategorilerde olanları ve olmayanları (Eski veriler) bul
+        for kat in KATEGORILER:
+            # Kategoriye göre filtrele (Mesaj sütununda kategori tutuyoruz)
+            # Eğer 'Genel' ise, kategorisi boş olanları veya 'Genel' olanları al
+            if kat == "Genel":
+                items = alinacaklar[(alinacaklar["Mesaj"] == "Genel") | (alinacaklar["Mesaj"] == "") | (alinacaklar["Mesaj"] == "None")]
+            else:
+                items = alinacaklar[alinacaklar["Mesaj"] == kat]
+            
+            if not items.empty:
+                st.markdown(f"<div class='category-header'>{kat}</div>", unsafe_allow_html=True)
+                for i, row in items.iterrows():
+                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                    with c1:
+                        if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
+                    with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
+
         st.divider()
-        with st.expander("📦 Geçmiş (Şef Burayı Okur)"):
+        # GEÇMİŞ (Kategori önemsiz, düz liste)
+        tamamlananlar = df_market[df_market["Durum"] == "1"]
+        with st.expander(f"📦 Geçmiş ({len(tamamlananlar)})"):
             for i, row in tamamlananlar.iterrows():
                 c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
                 with c1:
