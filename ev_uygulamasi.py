@@ -81,6 +81,7 @@ if 'local_df' not in st.session_state:
 # HIZLI İŞLEM FONKSİYONLARI
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
+    # Benzersiz olması için alarm isimlerine tarih ekleyebiliriz ama basit tutalım
     yeni_satir = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
     t = threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],))
@@ -126,13 +127,34 @@ def bildirim_gonder(mesaj):
 
 def alarm_kur(mesaj, sure):
     hedef = datetime.now() + timedelta(minutes=sure)
-    t = threading.Thread(target=arka_planda_ekle, args=(["", "-1", mesaj, hedef.strftime("%Y-%m-%d %H:%M:%S"), "ALARM"],))
-    t.start()
+    hedef_str = hedef.strftime("%Y-%m-%d %H:%M:%S")
+    # Alarmı listeye ekle (Veritabanına)
+    # Tip="ALARM", Mesaj=Not, Zaman=HedefSaat, Urun=BenzersizID(Mesaj+Saat)
+    benzersiz_ad = f"{mesaj} ({hedef.strftime('%H:%M')})"
+    hizli_ekle(isim=benzersiz_ad, tip="ALARM", zaman=hedef_str, mesaj=mesaj, durum="-1")
+    
+    # Bildirim
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
 # GÖRÜNÜM FONKSİYONLARI
 # ==============================================================================
+def silme_butonu_koy(key_prefix, urun_adi):
+    """Her yer için ortak güvenli silme butonu"""
+    sil_key = f"del_{key_prefix}_{urun_adi}"
+    conf_key = f"conf_{key_prefix}_{urun_adi}"
+    
+    if not st.session_state.get(conf_key):
+        if st.button("🗑️", key=sil_key):
+            st.session_state[conf_key] = True
+            st.rerun()
+    else:
+        if st.button("Sil?", key=f"yes_{sil_key}", type="primary"):
+            hizli_sil(urun_adi)
+            st.session_state[conf_key] = False
+            st.rerun()
+        st.caption("İptal: Yenile")
+
 def liste_goster(liste_tipi):
     df = st.session_state.local_df
     
@@ -152,21 +174,13 @@ def liste_goster(liste_tipi):
         for index, row in alinacaklar.iterrows():
             c1, c2 = st.columns([5, 1])
             with c1:
+                # Key: index kullanarak çakışmayı önle
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
                     hizli_durum_degistir(row['Urun'], "1")
                     st.rerun()
             with c2:
-                sil_key = f"del_{liste_tipi}_{index}"
-                conf_key = f"conf_{liste_tipi}_{index}"
-                if not st.session_state.get(conf_key):
-                    if st.button("🗑️", key=sil_key):
-                        st.session_state[conf_key] = True
-                        st.rerun()
-                else:
-                    if st.button("Sil?", key=f"yes_{sil_key}", type="primary"):
-                        hizli_sil(row['Urun'])
-                        st.session_state[conf_key] = False
-                        st.rerun()
+                # GÜVENLİ SİLME
+                silme_butonu_koy(f"{liste_tipi}_{index}", row['Urun'])
         
         st.divider()
 
@@ -179,9 +193,7 @@ def liste_goster(liste_tipi):
                         hizli_durum_degistir(row['Urun'], "0")
                         st.rerun()
                 with c_b:
-                    if st.button("🗑️", key=f"delfin_{liste_tipi}_{index}"):
-                        hizli_sil(row['Urun'])
-                        st.rerun()
+                    silme_butonu_koy(f"fin_{liste_tipi}_{index}", row['Urun'])
 
 def fatura_listesi_goster():
     df = st.session_state.local_df
@@ -219,11 +231,58 @@ def fatura_listesi_goster():
                         st.warning("Günü geçti")
                 
                 with c3:
-                    if st.button("🗑️", key=f"del_fat_{index}"):
-                        hizli_sil(row['Urun'])
-                        st.rerun()
-                st.divider()
+                    # GÜVENLİ SİLME (ÖDEMELER İÇİN EKLENDİ)
+                    silme_butonu_koy(f"fat_{index}", row['Urun'])
+                    
+            st.divider()
         except: pass
+
+def alarm_listesi_goster():
+    """Aktif alarmları ve kalan sürelerini gösterir"""
+    df = st.session_state.local_df
+    df_alarm = df[df["Tip"] == "ALARM"]
+    
+    if df_alarm.empty:
+        return # Alarm yoksa gösterme
+
+    st.markdown("---")
+    st.subheader("⏳ Aktif Alarmlar")
+    
+    simdi = datetime.now()
+
+    for index, row in df_alarm.iterrows():
+        try:
+            hedef_zaman = datetime.strptime(row["Zaman"], "%Y-%m-%d %H:%M:%S")
+            kalan_sure = hedef_zaman - simdi
+            toplam_saniye = kalan_sure.total_seconds()
+            
+            c1, c2, c3 = st.columns([3, 2, 1])
+            
+            with c1:
+                st.write(f"**{row['Mesaj']}**")
+                st.caption(f"Hedef: {hedef_zaman.strftime('%H:%M')}")
+            
+            with c2:
+                if toplam_saniye > 0:
+                    dakika = int(toplam_saniye / 60)
+                    saniye = int(toplam_saniye % 60)
+                    if dakika > 60:
+                        saat = int(dakika / 60)
+                        dk = dakika % 60
+                        st.info(f"⏳ {saat} sa {dk} dk")
+                    else:
+                        st.info(f"⏳ {dakika} dk {saniye} sn")
+                else:
+                    st.error("🔔 SÜRE DOLDU")
+            
+            with c3:
+                # Alarmları da güvenli silme ile silelim (veya iptal edelim)
+                silme_butonu_koy(f"alarm_{index}", row['Urun'])
+            
+            st.divider()
+
+        except: pass
+
 
 # ==============================================================================
 # ANA EKRAN
@@ -264,7 +323,6 @@ with tab3:
             st.time_input("Hatırlatma Saati", value=dt_time(9, 0), key="fat_saat")
             st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek Seferlik"], key="fat_tekrar")
         
-        # HATA DÜZELTİLDİ: Parantez hatası olmasın diye alt alta yazdım
         st.button("KAYDET", 
                   key="btn_f", 
                   on_click=fatura_callback, 
@@ -274,9 +332,15 @@ with tab3:
     fatura_listesi_goster()
 
 with tab4:
+    st.info("Buradan alarm kurabilirsin. Aşağıda aktif geri sayımları görebilirsin.")
     with st.form("alarm"):
-        mesaj = st.text_input("Not", placeholder="Fırın...")
+        mesaj = st.text_input("Not", placeholder="Fırın, Kombi...")
         sure = st.number_input("Dakika", min_value=1, value=15)
         if st.form_submit_button("🔔 Kur", use_container_width=True):
             alarm_kur(mesaj, sure)
             st.success("Kuruldu!")
+            time.sleep(1) # Listeye düşmesi için ufak bekleme
+            st.rerun()
+            
+    # YENİ EKLENEN KISIM: AKTİF ALARMLAR LİSTESİ
+    alarm_listesi_goster()
