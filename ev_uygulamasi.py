@@ -33,43 +33,45 @@ def baglanti_kur():
         return None
 
 def verileri_hazirla():
-    """Tabloyu çeker, yeni sütun (Tip) yoksa ekler"""
+    """HATA DUZELTICI FONKSIYON: Sütunlar eksikse tamamlar"""
     sheet = baglanti_kur()
     if not sheet: return pd.DataFrame()
 
     try:
         data = sheet.get_all_values()
-        
-        # Sayfa boşsa başlıkları kur
+        GEREKLI_BASLIKLAR = ["Urun", "Durum", "Mesaj", "Zaman", "Tip"]
+
+        # 1. Sayfa Bomboşsa -> Başlıkları yaz
         if not data:
-            basliklar = ["Urun", "Durum", "Mesaj", "Zaman", "Tip"]
-            sheet.append_row(basliklar)
-            return pd.DataFrame(columns=basliklar)
+            sheet.append_row(GEREKLI_BASLIKLAR)
+            return pd.DataFrame(columns=GEREKLI_BASLIKLAR)
 
-        # Başlık kontrolü
-        headers = data[0]
-        if "Tip" not in headers:
-            # Eski versiyondan geçiş: Tip sütunu ekle
-            sheet.update_cell(1, 5, "Tip") # E1 hücresi
-            # Var olan tüm satırlara 'MARKET' yaz
-            if len(data) > 1:
-                # Toplu güncelleme yapmak yerine boş bırakalım, kod 'MARKET' saysın
-                pass
-            data = sheet.get_all_values() # Tekrar çek
-
+        # 2. Veriyi DataFrame'e çevir
+        # İlk satırı başlık kabul ediyoruz
         df = pd.DataFrame(data[1:], columns=data[0])
+
+        # 3. EKSİK SÜTUN KONTROLÜ (Hatanın Çözümü)
+        # Eğer "Durum" veya "Tip" sütunu yoksa, DataFrame içinde sanal olarak oluştur
+        # Böylece uygulama çökmez.
+        for col in GEREKLI_BASLIKLAR:
+            if col not in df.columns:
+                df[col] = "" # Eksik sütunu boşlukla doldur
+
         return df
-    except:
-        return pd.DataFrame()
+    except Exception as e:
+        # Çok kötü bir şey olursa boş tablo dön ki uygulama çökmesin
+        return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
 
 # ==============================================================================
 # İŞLEMLER
 # ==============================================================================
 def urun_ekle(isim, tip):
-    """Tip: MARKET veya TODO"""
     sheet = baglanti_kur()
     if sheet:
-        # Urun, Durum(0), Mesaj, Zaman, Tip
+        # Eğer sayfa boşsa başlıkları eklemesini garantile
+        if len(sheet.get_all_values()) == 0:
+            sheet.append_row(["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
+            
         sheet.append_row([isim, "0", "", "", tip])
         st.cache_data.clear()
 
@@ -87,6 +89,8 @@ def durum_degistir(isim, yeni_durum):
     if sheet:
         try:
             cell = sheet.find(isim)
+            # Durum sütunu genelde 2. sütundur ama garanti olsun diye başlığa göre bulalım
+            # Basitlik için 2. sütun varsayıyoruz (Standart yapı)
             sheet.update_cell(cell.row, 2, str(yeni_durum))
             st.cache_data.clear()
         except: pass
@@ -104,30 +108,33 @@ def bildirim_gonder(mesaj):
     except: pass
 
 # ==============================================================================
-# YARDIMCI GÖRÜNÜM FONKSİYONU (LİSTELEYİCİ)
+# YARDIMCI GÖRÜNÜM (GÜVENLİ SİLME VE LİSTELEME)
 # ==============================================================================
 def liste_goster(dataframe, liste_tipi):
-    """Market ve Yapılacaklar için ortak görünüm fonksiyonu"""
-    # İlgili tipi filtrele (Tip sütunu boşsa Market say)
+    if dataframe.empty:
+        st.info("Veri yükleniyor veya liste boş.")
+        return
+
+    # Tip filtreleme (Boş olanları MARKET say)
     if liste_tipi == "MARKET":
         df_aktif = dataframe[(dataframe["Tip"] == "MARKET") | (dataframe["Tip"] == "") | (dataframe["Tip"].isnull())]
     else:
         df_aktif = dataframe[dataframe["Tip"] == liste_tipi]
 
     if not df_aktif.empty:
-        alinacaklar = df_aktif[df_aktif["Durum"] == "0"]
-        tamamlananlar = df_aktif[df_aktif["Durum"] == "1"]
+        # Durum filtresi (String olarak '0' veya '1' kontrolü)
+        alinacaklar = df_aktif[df_aktif["Durum"].astype(str) == "0"]
+        tamamlananlar = df_aktif[df_aktif["Durum"].astype(str) == "1"]
 
-        # --- AKTİF LİSTE ---
+        # --- BEKLEYENLER ---
         st.subheader(f"📌 Bekleyenler ({len(alinacaklar)})")
         
         if alinacaklar.empty:
-            st.success("Liste tertemiz! 🎉")
+            st.success("Temiz! 🎉")
         
         for index, row in alinacaklar.iterrows():
             c1, c2 = st.columns([5, 1])
             with c1:
-                # Checkbox
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
                     durum_degistir(row['Urun'], "1")
                     st.rerun()
@@ -136,23 +143,20 @@ def liste_goster(dataframe, liste_tipi):
                 sil_key = f"del_btn_{liste_tipi}_{index}"
                 onay_key = f"confirm_{liste_tipi}_{index}"
 
-                # Eğer onay butonuna basılmadıysa çöp kutusunu göster
                 if not st.session_state.get(onay_key):
                     if st.button("🗑️", key=sil_key):
                         st.session_state[onay_key] = True
                         st.rerun()
                 else:
-                    # Onay modundaysa kırmızı buton göster
                     if st.button("Sil?", key=f"yes_{sil_key}", type="primary"):
                         urun_sil(row['Urun'])
-                        st.session_state[onay_key] = False # Sıfırla
+                        st.session_state[onay_key] = False
                         st.rerun()
-                    # Vazgeçmek için sayfayı yenileyebilir veya boş bir yere tıklayabilir (Basit tuttum)
-                    st.caption("İptal: Sayfayı yenile")
+                    st.caption("İptal: Yenile")
 
         st.divider()
 
-        # --- TAMAMLANANLAR ---
+        # --- GEÇMİŞ / TAMAMLANAN ---
         baslik = "📦 Evde Var / Geçmiş" if liste_tipi == "MARKET" else "✅ Tamamlanan İşler"
         with st.expander(f"{baslik} ({len(tamamlananlar)})"):
             if tamamlananlar.empty:
@@ -165,7 +169,6 @@ def liste_goster(dataframe, liste_tipi):
                             durum_degistir(row['Urun'], "0")
                             st.rerun()
                     with c_b:
-                        # Burada da silme onayı olsun
                         sil_key_t = f"del_fin_{liste_tipi}_{index}"
                         onay_key_t = f"conf_fin_{liste_tipi}_{index}"
                         
@@ -182,57 +185,49 @@ def liste_goster(dataframe, liste_tipi):
         st.info("Henüz bir şey eklenmemiş.")
 
 # ==============================================================================
-# ANA ARAYÜZ
+# ANA EKRAN
 # ==============================================================================
 st.markdown("<h3 style='text-align: center;'>🏠 Yunus Hocam'ın Asistanı</h3>", unsafe_allow_html=True)
 
+# Veriyi güvenli şekilde çek
 df = verileri_hazirla()
 
-# 3 SEKME YAPTIK
 tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 YAPILACAKLAR", "⏰ ALARM"])
 
-# --- TAB 1: MARKET ---
 with tab1:
     col1, col2 = st.columns([3, 1])
     with col1:
-        yeni_market = st.text_input("Market Ürünü Ekle", placeholder="Süt, Ekmek...", label_visibility="collapsed", key="input_market")
+        yeni_market = st.text_input("Market Ürünü", placeholder="Süt...", label_visibility="collapsed", key="in_m")
     with col2:
-        if st.button("EKLE", key="btn_add_market", use_container_width=True):
+        if st.button("EKLE", key="btn_m", use_container_width=True):
             if yeni_market:
                 urun_ekle(yeni_market, "MARKET")
-                st.success("Eklendi")
+                st.success("Tamam")
                 time.sleep(0.5)
                 st.rerun()
-    
     st.markdown("---")
     liste_goster(df, "MARKET")
 
-# --- TAB 2: YAPILACAKLAR (YENİ!) ---
 with tab2:
     col1, col2 = st.columns([3, 1])
     with col1:
-        yeni_todo = st.text_input("İş Ekle", placeholder="Fatura öde, Arabayı yıka...", label_visibility="collapsed", key="input_todo")
+        yeni_todo = st.text_input("İş Ekle", placeholder="Fatura...", label_visibility="collapsed", key="in_t")
     with col2:
-        if st.button("EKLE", key="btn_add_todo", use_container_width=True):
+        if st.button("EKLE", key="btn_t", use_container_width=True):
             if yeni_todo:
                 urun_ekle(yeni_todo, "TODO")
-                st.success("Eklendi")
+                st.success("Tamam")
                 time.sleep(0.5)
                 st.rerun()
-    
     st.markdown("---")
     liste_goster(df, "TODO")
 
-# --- TAB 3: ALARM ---
 with tab3:
-    st.info("Süre dolunca bildirim gelir.")
-    with st.form("alarm_form"):
-        mesaj = st.text_input("Not", placeholder="Fırını kapat")
+    with st.form("alarm"):
+        mesaj = st.text_input("Not", placeholder="Fırın...")
         sure = st.number_input("Dakika", min_value=1, value=15)
-        
-        if st.form_submit_button("🔔 Alarmı Kur", use_container_width=True):
+        if st.form_submit_button("🔔 Kur", use_container_width=True):
             hedef = datetime.now() + timedelta(minutes=sure)
-            hedef_str = hedef.strftime("%Y-%m-%d %H:%M:%S")
-            alarm_ekle(mesaj, hedef_str)
-            bildirim_gonder(f"✅ Alarm kuruldu: {sure} dk sonra '{mesaj}'")
-            st.success("Kaydedildi!")
+            alarm_ekle(mesaj, hedef.strftime("%Y-%m-%d %H:%M:%S"))
+            bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
+            st.success("Kuruldu!")
