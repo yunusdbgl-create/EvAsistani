@@ -32,17 +32,14 @@ st.markdown("""
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; font-style: italic; }
 
-    /* Kategori Başlıkları İçin Renkli Rozetler */
+    /* Kategori Rozetleri */
     .cat-badge {
         display: inline-block; padding: 4px 12px; border-radius: 12px;
         color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
     }
     
-    /* Bölüm Başlıkları */
-    .section-title {
-        font-size: 18px; font-weight: bold; color: #444; 
-        border-left: 5px solid #ff9a9e; padding-left: 10px; margin-top: 20px; margin-bottom: 10px;
-    }
+    /* Expander Başlıkları */
+    .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -57,10 +54,9 @@ def get_kategori_renk(kategori):
         "Atıştırmalık": "#e84393", # Pembe
         "Genel": "#95a5a6" # Gri
     }
-    # Kategori adının içinde geçen kelimeye göre renk bul
     for key, color in renkler.items():
         if key in kategori: return color
-    return "#34495e" # Varsayılan koyu mavi
+    return "#34495e"
 
 # ==============================================================================
 # AI MUTFAK ŞEFİ
@@ -101,7 +97,7 @@ def karsilama_paneli():
     saat = datetime.now().hour
     selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
     sozler = [
-        "🏡 Evimiz kalemizdir.", "💡 Renkli kategorilerle hayat daha kolay.",
+        "🏡 Evimiz kalemizdir.", "💡 Kategorileri tıklayarak açıp kapatabilirsin.",
         "🐈 Prenses'e selamlar!", "❤️ Geçmiş listesi artık çok daha derli toplu.",
         "🛒 Alınacaklar listesi seni bekliyor.", "👨‍🍳 Şef bugün ne pişirsek diyor?"
     ]
@@ -251,7 +247,9 @@ def silme_butonu_koy(prefix, urun):
     if not st.session_state.get(f"conf_{prefix}_{urun}"):
         if st.button("🗑️", key=f"del_{prefix}_{urun}"): st.session_state[f"conf_{prefix}_{urun}"] = True; st.rerun()
     else:
-        if st.button("Sil?", key=f"yes_{prefix}_{urun}", type="primary"): hizli_sil(urun); st.session_state[f"conf_{prefix}_{urun}"] = False; st.rerun()
+        if st.button("Sil?", key=f"yes_{prefix}_{urun}", type="primary"):
+            hizli_sil(urun)
+            st.session_state[f"conf_{prefix}_{urun}"] = False; st.rerun()
         st.caption("İptal")
 
 # ==============================================================================
@@ -282,7 +280,7 @@ def sayfa_ana_ekran():
         # AKTİF LİSTE (ALINACAKLAR)
         alinacaklar = df_market[df_market["Durum"] == "0"]
         
-        st.markdown('<div class="section-title">📌 Alınacaklar Listesi</div>', unsafe_allow_html=True)
+        st.subheader("📌 Alınacaklar Listesi")
         if alinacaklar.empty: st.success("Sepet Boş! 🎉")
         
         kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
@@ -293,16 +291,17 @@ def sayfa_ana_ekran():
             else: items = alinacaklar[alinacaklar["Mesaj"] == kat]
             
             if not items.empty:
-                # Renkli Başlık (Expander Yerine) - Alınacaklarda açık durması daha iyi
+                # RENKLİ EXPANDER
                 renk = get_kategori_renk(kat)
-                st.markdown(f"<div style='background-color:{renk};' class='cat-badge'>{kat} ({len(items)})</div>", unsafe_allow_html=True)
-                # Direkt liste (Tıklamaya gerek yok, göz önünde olsun)
-                for i, row in items.iterrows():
-                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                    with c1:
-                        if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                    with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
-                st.write("") # Boşluk
+                # Expander kullanarak açılır/kapanır yaptık. Varsayılan olarak AÇIK.
+                with st.expander(f"{kat} ({len(items)})", expanded=True):
+                    # İçine de renkli bir çizgi koyalım ki kategoriler belli olsun
+                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
+                    for i, row in items.iterrows():
+                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                        with c1:
+                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
+                        with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
 
         st.divider()
         
@@ -316,7 +315,6 @@ def sayfa_ana_ekran():
                     else: items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
                     
                     if not items.empty:
-                        # Burada iç içe expander kullanıyoruz
                         with st.expander(f"{kat} ({len(items)})"):
                             for i, row in items.iterrows():
                                 c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
@@ -343,20 +341,20 @@ def sayfa_ana_ekran():
         is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
         if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
 
-        st.markdown('<div class="section-title">📌 Yapılacaklar Listesi</div>', unsafe_allow_html=True)
+        st.subheader("📌 Yapılacaklar Listesi")
         for kat in is_listesi:
             if kat == "Genel": items = df_todo[(df_todo["Durum"] == "0") & ((df_todo["Mesaj"] == "") | (df_todo["Mesaj"] == "Genel") | (df_todo["Mesaj"] == "None"))]
             else: items = df_todo[(df_todo["Durum"] == "0") & (df_todo["Mesaj"] == kat)]
             
             if not items.empty:
                 renk = get_kategori_renk(kat)
-                st.markdown(f"<div style='background-color:{renk};' class='cat-badge'>{kat} ({len(items)})</div>", unsafe_allow_html=True)
-                for i, row in items.iterrows():
-                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                    with c1:
-                        if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                    with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
-                st.write("")
+                with st.expander(f"{kat} ({len(items)})", expanded=True):
+                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
+                    for i, row in items.iterrows():
+                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                        with c1:
+                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
+                        with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
 
     with tab3:
         with st.form("alarm"):
