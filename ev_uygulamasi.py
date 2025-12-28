@@ -49,7 +49,7 @@ def arka_planda_guncelle(urun_adi, yeni_durum):
     except: pass
 
 # ==============================================================================
-# YEREL VERİ VE HIZLI İŞLEMLER
+# YEREL VERİ
 # ==============================================================================
 def verileri_yukle():
     try:
@@ -77,6 +77,9 @@ def verileri_yukle():
 if 'local_df' not in st.session_state:
     st.session_state.local_df = verileri_yukle()
 
+# ==============================================================================
+# HIZLI İŞLEM FONKSİYONLARI
+# ==============================================================================
 def hizli_ekle(isim, tip, zaman=""):
     yeni_satir = {"Urun": isim, "Durum": "0", "Mesaj": "", "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
@@ -84,40 +87,51 @@ def hizli_ekle(isim, tip, zaman=""):
     t.start()
 
 def hizli_sil(isim):
+    # İsim bazlı silme (Duplicate varsa hepsini siler, temizlik olur)
     st.session_state.local_df = st.session_state.local_df[st.session_state.local_df["Urun"] != isim]
     t = threading.Thread(target=arka_planda_sil, args=(isim,))
     t.start()
 
 def hizli_durum_degistir(isim, yeni_durum):
-    idx = st.session_state.local_df[st.session_state.local_df["Urun"] == isim].index
-    if not idx.empty:
-        st.session_state.local_df.at[idx[0], "Durum"] = str(yeni_durum)
+    # Tüm aynı isimli ürünleri güncelle
+    st.session_state.local_df.loc[st.session_state.local_df["Urun"] == isim, "Durum"] = str(yeni_durum)
     t = threading.Thread(target=arka_planda_guncelle, args=(isim, yeni_durum))
     t.start()
 
-# ==============================================================================
-# 🛠️ DÜZELTİLEN KISIM: CALLBACK FONKSİYONLARI
-# ==============================================================================
+# CALLBACKLER
 def ekleme_callback(input_key, tip):
-    """Butona basılınca çalışır, ekler ve temizler"""
-    girilen_yazi = st.session_state[input_key]
-    if girilen_yazi:
-        hizli_ekle(girilen_yazi, tip)
-        st.session_state[input_key] = "" # TEMİZLİK BURADA YAPILIR
+    val = st.session_state[input_key]
+    if val:
+        hizli_ekle(val, tip)
+        st.session_state[input_key] = ""
 
 def fatura_callback():
-    """Fatura için özel ekleme ve temizleme"""
-    ad = st.session_state.fat_ad
+    val = st.session_state.fat_ad
     gun = st.session_state.fat_gun
-    if ad:
-        hizli_ekle(ad, "FATURA", gun)
-        st.session_state.fat_ad = "" # Sadece isimi temizle, gün kalsın
+    if val:
+        hizli_ekle(val, "FATURA", gun)
+        st.session_state.fat_ad = ""
+
+def bildirim_gonder(mesaj):
+    try:
+        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
+                      data=mesaj.encode('utf-8'),
+                      headers={"Title": "Ev Asistanı".encode('utf-8'), "Priority": "high"})
+    except: pass
+
+def alarm_kur(mesaj, sure):
+    hedef = datetime.now() + timedelta(minutes=sure)
+    t = threading.Thread(target=arka_planda_ekle, args=(["", "-1", mesaj, hedef.strftime("%Y-%m-%d %H:%M:%S"), "ALARM"],))
+    t.start()
+    bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM
+# GÖRÜNÜM (HATA ÇÖZÜLEN KISIM)
 # ==============================================================================
 def liste_goster(liste_tipi):
     df = st.session_state.local_df
+    
+    # Filtreleme
     if liste_tipi == "MARKET":
         mask = (df["Tip"] == "MARKET") | (df["Tip"] == "") | (df["Tip"] == "None")
         df_aktif = df[mask]
@@ -131,15 +145,18 @@ def liste_goster(liste_tipi):
         st.subheader(f"📌 Bekleyenler ({len(alinacaklar)})")
         if alinacaklar.empty: st.success("Tertemiz! 🎉")
         
+        # HATA BURADAYDI: Key olarak isim yerine 'index' kullanıyoruz
         for index, row in alinacaklar.iterrows():
             c1, c2 = st.columns([5, 1])
             with c1:
-                if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{row['Urun']}"):
+                # Key artık benzersiz (index kullanıldı)
+                if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
                     hizli_durum_degistir(row['Urun'], "1")
                     st.rerun()
             with c2:
-                sil_key = f"del_{liste_tipi}_{row['Urun']}"
-                conf_key = f"conf_{liste_tipi}_{row['Urun']}"
+                sil_key = f"del_{liste_tipi}_{index}"
+                conf_key = f"conf_{liste_tipi}_{index}"
+                
                 if not st.session_state.get(conf_key):
                     if st.button("🗑️", key=sil_key):
                         st.session_state[conf_key] = True
@@ -157,11 +174,11 @@ def liste_goster(liste_tipi):
             for index, row in tamamlananlar.iterrows():
                 c_a, c_b = st.columns([4, 1])
                 with c_a:
-                    if st.button(f"➕ {row['Urun']}", key=f"back_{liste_tipi}_{row['Urun']}", use_container_width=True):
+                    if st.button(f"➕ {row['Urun']}", key=f"back_{liste_tipi}_{index}", use_container_width=True):
                         hizli_durum_degistir(row['Urun'], "0")
                         st.rerun()
                 with c_b:
-                    if st.button("🗑️", key=f"delfin_{liste_tipi}_{row['Urun']}"):
+                    if st.button("🗑️", key=f"delfin_{liste_tipi}_{index}"):
                         hizli_sil(row['Urun'])
                         st.rerun()
 
@@ -188,7 +205,7 @@ def fatura_listesi_goster():
                 elif kalan > 0: st.success(f"⏳ {kalan} gün")
                 else: st.caption(f"Ayın {odeme_gunu}'i")
             with c3:
-                 if st.button("🗑️", key=f"del_fat_{row['Urun']}"):
+                 if st.button("🗑️", key=f"del_fat_{index}"):
                      hizli_sil(row['Urun'])
                      st.rerun()
             st.divider()
@@ -205,29 +222,24 @@ if st.button("🔄 Verileri Yenile", use_container_width=True):
 
 tab1, tab2, tab3, tab4 = st.tabs(["🛒 MARKET", "📝 İŞLER", "💸 ÖDEMELER", "⏰ ALARM"])
 
-# --- MARKET ---
 with tab1:
     c1, c2 = st.columns([3, 1])
     with c1:
         st.text_input("Market", placeholder="Ürün...", label_visibility="collapsed", key="market_giris")
     with c2:
-        # BURASI DEĞİŞTİ: on_click kullandık
         st.button("EKLE", key="btn_m", on_click=ekleme_callback, args=("market_giris", "MARKET"), use_container_width=True)
     st.markdown("---")
     liste_goster("MARKET")
 
-# --- İŞLER ---
 with tab2:
     c1, c2 = st.columns([3, 1])
     with c1:
         st.text_input("Görev", placeholder="İş...", label_visibility="collapsed", key="is_giris")
     with c2:
-        # BURASI DEĞİŞTİ: on_click kullandık
         st.button("EKLE", key="btn_t", on_click=ekleme_callback, args=("is_giris", "TODO"), use_container_width=True)
     st.markdown("---")
     liste_goster("TODO")
 
-# --- ÖDEMELER ---
 with tab3:
     c1, c2, c3 = st.columns([3, 2, 1])
     with c1:
@@ -235,23 +247,14 @@ with tab3:
     with c2:
         st.number_input("Ayın Günü", min_value=1, max_value=31, value=15, label_visibility="collapsed", key="fat_gun")
     with c3:
-        # BURASI DEĞİŞTİ: on_click kullandık
         st.button("EKLE", key="btn_f", on_click=fatura_callback, use_container_width=True)
     st.markdown("---")
     fatura_listesi_goster()
 
-# --- ALARM ---
 with tab4:
     with st.form("alarm"):
         mesaj = st.text_input("Not", placeholder="Fırın...")
         sure = st.number_input("Dakika", min_value=1, value=15)
         if st.form_submit_button("🔔 Kur", use_container_width=True):
-            hedef = datetime.now() + timedelta(minutes=sure)
-            t = threading.Thread(target=arka_planda_ekle, args=(["", "-1", mesaj, hedef.strftime("%Y-%m-%d %H:%M:%S"), "ALARM"],))
-            t.start()
-            try:
-                requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
-                              data=f"✅ Alarm: {sure} dk sonra '{mesaj}'".encode('utf-8'),
-                              headers={"Title": "Ev Asistanı".encode('utf-8'), "Priority": "high"})
-            except: pass
+            alarm_kur(mesaj, sure)
             st.success("Kuruldu!")
