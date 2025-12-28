@@ -38,37 +38,57 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# AI MUTFAK ŞEFİ MOTORU
+# AI MUTFAK ŞEFİ MOTORU (GELİŞMİŞ)
 # ==============================================================================
-def mutfak_sefi_motoru(eldekiler):
+def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
+    # Verileri birleştir ve küçük harfe çevir (Eşleşme kolay olsun diye)
+    tum_malzemeler = set()
+    
+    # Marketten gelenleri temizle (Örn: "Yumurta (10lu)" -> "yumurta")
+    for urun in marketten_gelenler:
+        temiz_ad = urun.lower().split("(")[0].strip()
+        tum_malzemeler.add(temiz_ad)
+        
+    for urun in manuel_eklenenler:
+        tum_malzemeler.add(urun.lower())
+
+    # Tarif Veritabanı (Hepsi küçük harf olmalı)
     tarifler = {
-        "Menemen": ["Yumurta", "Domates", "Biber"],
-        "Omlet": ["Yumurta", "Peynir", "Tereyağı"],
-        "Mercimek Çorbası": ["Mercimek", "Soğan", "Salça", "Yağ"],
-        "Karnıyarık": ["Patlıcan", "Kıyma", "Domates", "Soğan"],
-        "Köfte Patates": ["Kıyma", "Patates", "Soğan", "Ekmek"],
-        "Makarna": ["Makarna", "Salça", "Yağ"],
-        "Tavuk Sote": ["Tavuk", "Biber", "Domates", "Soğan"],
-        "Kısır": ["Bulgur", "Salça", "Yeşillik", "Limon"],
-        "Cacık": ["Yoğurt", "Salatalık", "Sarımsak"],
-        "Pilav": ["Pirinç", "Tereyağı", "Şehriye"],
-        "Patates Kızartması": ["Patates", "Yağ"],
-        "Çoban Salata": ["Domates", "Salatalık", "Biber", "Soğan"],
-        "Mantarlı Tavuk": ["Tavuk", "Mantar", "Krema"],
-        "Hamburger": ["Kıyma", "Ekmek", "Domates", "Yeşillik"]
+        "Menemen": ["yumurta", "domates", "biber"],
+        "Omlet": ["yumurta", "peynir", "tereyağı"],
+        "Mercimek Çorbası": ["mercimek", "soğan", "salça", "yağ"],
+        "Karnıyarık": ["patlıcan", "kıyma", "domates", "soğan"],
+        "Köfte Patates": ["kıyma", "patates", "soğan", "ekmek"],
+        "Makarna": ["makarna", "salça", "yağ"],
+        "Tavuk Sote": ["tavuk", "biber", "domates", "soğan"],
+        "Kısır": ["bulgur", "salça", "yeşillik", "limon"],
+        "Cacık": ["yoğurt", "salatalık", "sarımsak"],
+        "Pilav": ["pirinç", "tereyağı", "şehriye"],
+        "Patates Kızartması": ["patates", "yağ"],
+        "Çoban Salata": ["domates", "salatalık", "biber", "soğan"],
+        "Mantarlı Tavuk": ["tavuk", "mantar", "krema"],
+        "Hamburger": ["kıyma", "ekmek", "domates", "yeşillik"]
     }
     
     tam_liste = []
     eksik_liste = []
     
     for yemek, malzemeler in tarifler.items():
-        eksikler = [m for m in malzemeler if m not in eldekiler]
+        # Eşleşme Kontrolü (İçeriyor mu?)
+        eksikler = []
+        for m in malzemeler:
+            # Malzeme adının herhangi bir parçası envanterde var mı?
+            # Örn: Envanterde "Domatesli sos" varsa, "domates" ihtiyacını karşılamaz ama tersi olur.
+            # Basit eşleşme:
+            if m not in tum_malzemeler:
+                eksikler.append(m)
+        
         if len(eksikler) == 0:
             tam_liste.append(yemek)
         elif len(eksikler) <= 2:
             eksik_liste.append((yemek, eksikler))
             
-    return tam_liste, eksik_liste
+    return tam_liste, eksik_liste, list(tum_malzemeler)
 
 # ==============================================================================
 # KARŞILAMA
@@ -79,7 +99,7 @@ def karsilama_paneli():
     sozler = [
         "🏡 Evimiz, huzurumuzdur.", "💡 Bütçeni kontrol et, rahat et.",
         "🐈 Prenses'i sevdiniz mi?", "❤️ Birbirinize zaman ayırın.",
-        "🛒 Alışveriş listesine baktın mı?", "👨‍🍳 Bugün mutfakta şef sensin!"
+        "🛒 Alışveriş listesine baktın mı?", "👨‍🍳 Şef, market listeni biliyor!"
     ]
     st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
 
@@ -244,7 +264,7 @@ def sayfa_ana_ekran():
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
             with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
         st.divider()
-        with st.expander("📦 Geçmiş"):
+        with st.expander("📦 Geçmiş (Şef Burayı Okur)"):
             for i, row in tamamlananlar.iterrows():
                 c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
                 with c1:
@@ -340,8 +360,36 @@ def sayfa_ekonomi():
                 with c2: silme_butonu_koy(f"y_{i}", row['Urun'])
 
 def sayfa_yasam():
-    tab1, tab2, tab3 = st.tabs(["⏳ SAYAÇ", "📒 NOTLAR", "👨‍🍳 ŞEF"])
+    tab1, tab2, tab3 = st.tabs(["👨‍🍳 ŞEF", "⏳ SAYAÇ", "📒 NOTLAR"])
+    
     with tab1:
+        st.subheader("👨‍🍳 AI Mutfak Şefi")
+        st.info("Market geçmişine bakar, ek malzemelerle tarif önerir.")
+        
+        # 1. Market Geçmişini Al
+        df = st.session_state.local_df
+        marketten_gelenler = df[(df["Tip"] == "MARKET") & (df["Durum"] == "1")]["Urun"].tolist()
+        
+        # 2. Ekstra Malzeme Seçimi
+        malzemeler = ["Yumurta", "Domates", "Biber", "Soğan", "Kıyma", "Patates", "Tavuk", "Makarna", "Salça", "Pirinç", "Mercimek", "Yoğurt", "Salatalık", "Patlıcan", "Mantar"]
+        ek_malzemeler = st.multiselect("Evde başka ne var?", malzemeler)
+        
+        if st.button("🔍 Ne Pişirsem?", type="primary", use_container_width=True):
+            tam, eksik, stok_listesi = mutfak_sefi_motoru(marketten_gelenler, ek_malzemeler)
+            
+            with st.expander("📦 Algılanan Stoklar"):
+                st.write(", ".join(stok_listesi))
+            
+            if tam:
+                st.success(f"✅ **Hemen Yapabilirsin:** {', '.join(tam)}")
+            
+            if eksik:
+                st.markdown("---"); st.warning("🛒 **Ufak Eksikler Var:**")
+                for yemek, eksikler in eksik: st.write(f"• **{yemek}** için eksik: *{', '.join(eksikler)}*")
+                
+            if not tam and not eksik: st.error("Bu malzemelerle bir tarif bulamadım. Biraz daha malzeme ekle!")
+
+    with tab2:
         with st.expander("➕ Yeni Sayaç", expanded=True):
             st.text_input("Etkinlik", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih")
             st.button("KAYDET", key="btn_syc_save", on_click=sayac_callback)
@@ -357,25 +405,12 @@ def sayfa_yasam():
                     st.divider()
                 except: pass
 
-    with tab2:
+    with tab3:
         with st.expander("➕ Not Ekle", expanded=True):
             st.text_input("Başlık", key="not_baslik"); st.text_area("İçerik", key="not_icerik"); st.button("KAYDET", key="btn_not_save", on_click=not_callback)
         df_n = st.session_state.local_df[st.session_state.local_df["Tip"] == "NOTE"]
         for i, row in df_n.iterrows():
             with st.expander(f"📒 {row['Urun']}"): st.code(row['Mesaj']); silme_butonu_koy(f"nt_{i}", row['Urun'])
-
-    with tab3:
-        st.subheader("👨‍🍳 AI Mutfak Şefi")
-        st.info("Evdeki malzemeleri seç, sana yemek önersin.")
-        malzemeler = ["Yumurta", "Domates", "Biber", "Soğan", "Kıyma", "Patates", "Tavuk", "Makarna", "Salça", "Pirinç", "Mercimek", "Yoğurt", "Salatalık", "Patlıcan", "Mantar"]
-        eldekiler = st.multiselect("Evde ne var?", malzemeler)
-        if st.button("🔍 Ne Pişirsem?", type="primary", use_container_width=True):
-            tam, eksik = mutfak_sefi_motoru(eldekiler)
-            if tam: st.success(f"✅ **Hemen Yapabilirsin:** {', '.join(tam)}")
-            if eksik:
-                st.markdown("---"); st.warning("🛒 **Ufak Eksikler Var:**")
-                for yemek, eksikler in eksik: st.write(f"• **{yemek}** için eksik: *{', '.join(eksikler)}*")
-            if not tam and not eksik: st.error("Bu malzemelerle bir tarif bulamadım. Biraz daha malzeme ekle!")
 
 def sayfa_dosya():
     st.subheader("📂 PDF Çevirici")
