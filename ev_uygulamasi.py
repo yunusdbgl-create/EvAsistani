@@ -7,7 +7,13 @@ import time
 from datetime import datetime, timedelta, time as dt_time
 import threading
 import random
-import plotly.express as px # Görselleştirme Sihirbazı
+
+# Grafik kütüphanesini güvenli içe aktarma
+try:
+    import plotly.express as px
+    GRAFIK_VAR = True
+except ImportError:
+    GRAFIK_VAR = False
 
 # ==============================================================================
 # AYARLAR
@@ -159,7 +165,7 @@ if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukl
 # HIZLI İŞLEMLER
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
-    # Rutinler için her gün sıfırlanabilir, o yüzden dupe check yapmayalım veya özel yapalım
+    # Rutinler için her gün sıfırlanabilir
     if tip in ["MARKET", "YEMEK_OGUN", "YEMEK_KAHVALTI"]:
         mevcut = st.session_state.local_df[(st.session_state.local_df["Tip"] == tip) & (st.session_state.local_df["Urun"] == isim)]
         if not mevcut.empty: return
@@ -190,7 +196,7 @@ def hizli_yatirim_guncelle(isim, miktar, notlar):
 
 def listeyi_temizle():
     st.session_state.local_df = st.session_state.local_df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
-    st.toast("🧹 Liste temizlendi! Fazlalıklar silindi.")
+    st.toast("🧹 Liste temizlendi!")
     time.sleep(1)
     st.rerun()
 
@@ -275,14 +281,11 @@ def silme_butonu_koy(prefix, urun):
 def dashboard_goster():
     df = st.session_state.local_df
     
-    # 1. Toplam Varlık
     df_y = df[df["Tip"] == "YATIRIM"]
     toplam_varlik = sum(float(r["Mesaj"]) for _, r in df_y.iterrows() if r["Mesaj"].replace('.','',1).isdigit())
     
-    # 2. Sıradaki Fatura
     df_f = df[df["Tip"] == "FATURA"]
-    siradaki_fatura = "Yok"
-    kalan_gun_txt = ""
+    siradaki_fatura = "Yok"; kalan_gun_txt = ""
     if not df_f.empty:
         bugun = datetime.now().day
         df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32)
@@ -294,10 +297,8 @@ def dashboard_goster():
                 kalan_gun_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
                 break
     
-    # 3. Market Sepeti
     sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
 
-    # Metric Gösterimi
     c1, c2, c3 = st.columns(3)
     c1.metric("💰 Varlıklar", f"{toplam_varlik:,.0f} ₺")
     c2.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
@@ -462,26 +463,27 @@ def sayfa_ekonomi():
             with c2: st.text_area("Not", height=100, key="yat_not"); st.button("KAYDET", key="btn_yat_save", on_click=yatirim_callback, use_container_width=True)
         df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]
         
-        # GÖRSEL ZEKA: PASTA GRAFİĞİ
-        if not df_y.empty:
+        # GRAFİK GÖSTERİMİ
+        if GRAFIK_VAR and not df_y.empty:
             df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if x.replace('.','',1).isdigit() else 0)
             toplam = df_y["Tutar"].sum()
-            
             st.markdown("---")
             c1, c2 = st.columns([1, 2])
-            with c1:
-                st.metric("💰 TOPLAM VARLIK", f"{toplam:,.0f} ₺")
+            with c1: st.metric("💰 TOPLAM", f"{toplam:,.0f} ₺")
             with c2:
-                # Basit ve Şık Pasta Grafiği
                 fig = px.pie(df_y, values='Tutar', names='Urun', title='Varlık Dağılımı', hole=0.4)
                 fig.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 st.plotly_chart(fig, use_container_width=True)
+        elif not df_y.empty:
+            st.warning("⚠️ Grafik için 'requirements.txt' dosyasına 'plotly' ekle.")
+            toplam = sum(float(r["Mesaj"]) for _, r in df_y.iterrows() if r["Mesaj"].replace('.','',1).isdigit())
+            st.metric("💰 TOPLAM", f"{toplam:,.0f} ₺")
 
-            st.divider()
-            for i, row in df_y.iterrows():
-                c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="center")
-                with c1: st.subheader(f"💎 {row['Urun']}"); st.caption(f"{row['Mesaj']} ₺ | {row['Durum']}")
-                with c2: silme_butonu_koy(f"y_{i}", row['Urun'])
+        st.divider()
+        for i, row in df_y.iterrows():
+            c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="center")
+            with c1: st.subheader(f"💎 {row['Urun']}"); st.caption(f"{row['Mesaj']} ₺ | {row['Durum']}")
+            with c2: silme_butonu_koy(f"y_{i}", row['Urun'])
 
 def sayfa_yasam():
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🎡 KAHVALTI", "🎡 YEMEK", "⛓️ ZİNCİR", "👨‍🍳 ŞEF", "⏳ SAYAÇ", "📒 NOTLAR"])
@@ -489,7 +491,6 @@ def sayfa_yasam():
     with st.expander("⚙️ Ayarlar / Temizlik"):
         if st.button("🧹 Çift Kayıtları Temizle", use_container_width=True): listeyi_temizle()
 
-    # KAHVALTI
     with tab1:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Kahvaltı Ekle", key="kahvalti_giris", label_visibility="collapsed")
@@ -510,7 +511,6 @@ def sayfa_yasam():
                     if chk: hizli_durum_degistir(row['Urun'], "0")
             with c2: silme_butonu_koy(f"k_del_{i}", row['Urun'])
 
-    # YEMEK
     with tab2:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Yemek Ekle", key="yemek_giris", label_visibility="collapsed")
@@ -531,25 +531,18 @@ def sayfa_yasam():
                     if chk: hizli_durum_degistir(row['Urun'], "0")
             with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
 
-    # ZİNCİRİ KIRMA (HABIT TRACKER)
     with tab3:
         st.caption("Günlük hedeflerini tamamla, zinciri kırma!")
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Rutin Ekle", key="rutin_giris", label_visibility="collapsed", placeholder="Su iç...")
         with c2: st.button("EKLE", key="btn_rutin", on_click=rutin_ekle_callback, use_container_width=True)
-        
         df_r = st.session_state.local_df[st.session_state.local_df["Tip"] == "RUTIN"]
         completed = len(df_r[df_r["Durum"] == "1"])
-        total = len(df_r)
-        
-        if total > 0:
-            st.progress(completed/total, text=f"Günlük İlerleme: %{int((completed/total)*100)}")
-        
+        if len(df_r) > 0: st.progress(completed/len(df_r), text=f"Günlük İlerleme: %{int((completed/len(df_r))*100)}")
         st.markdown("---")
         for i, row in df_r.iterrows():
             c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
             with c1:
-                # Rutinler her gün sıfırlanabilir mantıkta çalışır, burada manuel
                 is_done = (row['Durum'] == "1")
                 if st.checkbox(f"**{row['Urun']}**", value=is_done, key=f"r_chk_{i}"):
                     if not is_done: hizli_durum_degistir(row['Urun'], "1"); st.rerun()
@@ -557,7 +550,6 @@ def sayfa_yasam():
                     if is_done: hizli_durum_degistir(row['Urun'], "0"); st.rerun()
             with c2: silme_butonu_koy(f"r_del_{i}", row['Urun'])
 
-    # AI ŞEF
     with tab4:
         st.subheader("👨‍🍳 AI Mutfak Şefi")
         df = st.session_state.local_df
@@ -606,7 +598,7 @@ def sayfa_dosya():
 # ÇALIŞTIRMA
 # ==============================================================================
 karsilama_paneli()
-dashboard_goster() # YENİ DASHBOARD
+dashboard_goster() # DASHBOARD GÖSTERİMİ
 
 with st.sidebar:
     st.header("Menü")
