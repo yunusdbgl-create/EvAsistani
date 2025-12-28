@@ -29,10 +29,8 @@ st.markdown("""
     }
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; opacity: 0.95; }
-    .cat-header {
-        font-size: 16px; font-weight: bold; color: #333; background-color: #f0f2f6;
-        padding: 5px 10px; border-radius: 5px; margin-top: 10px; margin-bottom: 5px;
-    }
+    /* Expander başlıklarını biraz daha belirgin yapalım */
+    .streamlit-expanderHeader { font-weight: bold; color: #333; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -75,9 +73,9 @@ def karsilama_paneli():
     saat = datetime.now().hour
     selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
     sozler = [
-        "🏡 Evimiz, huzurumuzdur.", "💡 Temel listeyi yükleyerek zaman kazanabilirsin.",
-        "🐈 Prenses bugün nasıl?", "❤️ İşleri kategorilere ayırmak kafanı rahatlatır.",
-        "🛒 Geçmiş alışverişlerin de artık düzenli!", "👨‍🍳 Şef, dolaptakileri biliyor!"
+        "🏡 Evimiz, huzurumuzdur.", "💡 Eklediğin kategoriler hafızamda, merak etme.",
+        "🐈 Prenses bugün nasıl?", "❤️ Listeler artık çok daha düzenli.",
+        "🛒 Geçmiş alışverişlerin de artık gruplu!", "👨‍🍳 Şef, dolaptakileri biliyor!"
     ]
     st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
 
@@ -143,13 +141,12 @@ if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukl
 # HIZLI İŞLEMLER
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
-    # Duplicate check for Market items to avoid spamming button
     if tip == "MARKET":
         mevcut = st.session_state.local_df[
             (st.session_state.local_df["Tip"] == "MARKET") & 
             (st.session_state.local_df["Urun"] == isim)
         ]
-        if not mevcut.empty: return # Zaten varsa ekleme
+        if not mevcut.empty: return
 
     row = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([row])], ignore_index=True)
@@ -176,26 +173,6 @@ def hizli_yatirim_guncelle(isim, miktar, notlar):
         st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d")
         threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM")).start()
 
-def temel_ihtiyaclari_yukle():
-    TEMEL_LISTE = {
-        "🍞 Gıda & Bakliyat": ["Ekmek", "Pirinç", "Makarna", "Salça", "Sıvı Yağ", "Tuz", "Şeker", "Çay", "Kahve"],
-        "🥛 Süt & Kahvaltılık": ["Süt", "Yumurta", "Peynir", "Zeytin", "Tereyağı", "Yoğurt"],
-        "🍏 Meyve & Sebze": ["Domates", "Salatalık", "Patates", "Soğan", "Limon", "Maydanoz"],
-        "🧹 Temizlik": ["Bulaşık Deterjanı", "Çamaşır Suyu", "Tuvalet Kağıdı", "Kağıt Havlu", "Sünger", "Çöp Torbası"],
-        "🥩 Et & Şarküteri": ["Kıyma", "Tavuk"]
-    }
-    
-    sayac = 0
-    for kat, urunler in TEMEL_LISTE.items():
-        for urun in urunler:
-            hizli_ekle(urun, "MARKET", mesaj=kat)
-            sayac += 1
-            time.sleep(0.05) # API'yi boğmamak için minik bekleme
-    
-    st.toast(f"✅ {sayac} temel ürün listeye eklendi!")
-    time.sleep(1)
-    st.rerun()
-
 # CALLBACKLER
 def ekleme_callback(key, tip):
     val = st.session_state[key]
@@ -208,7 +185,6 @@ def market_ekleme_callback():
     kat_secim = st.session_state.market_kategori_secim
     kat_yeni = st.session_state.market_kategori_yeni
     
-    # Eğer "Yeni Kategori Yaz" seçildiyse ve input doluysa onu kullan
     if kat_secim == "✏️ Yeni Kategori Yaz" and kat_yeni:
         kategori = kat_yeni
     else:
@@ -217,7 +193,7 @@ def market_ekleme_callback():
     if val:
         hizli_ekle(val, "MARKET", mesaj=kategori)
         st.session_state.market_giris = ""
-        st.session_state.market_kategori_yeni = "" # Inputu temizle
+        st.session_state.market_kategori_yeni = ""
 
 def is_ekleme_callback():
     val = st.session_state.is_giris
@@ -286,82 +262,95 @@ def sayfa_ana_ekran():
     
     # --- MARKET ---
     with tab1:
-        # 1. TEMEL İHTİYAÇ BUTONU
-        if st.button("📥 Temel Ev İhtiyaçlarını Yükle (Otomatik)", key="btn_temel_yukle", use_container_width=True):
-            temel_ihtiyaclari_yukle()
+        # ÖĞRENEN KATEGORİ SİSTEMİ
+        df = st.session_state.local_df
+        df_market = df[df["Tip"] == "MARKET"]
         
-        # 2. ÜRÜN EKLEME ALANI
-        st.markdown("---")
-        KATEGORILER = ["🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt & Kahvaltılık", "🍞 Gıda & Bakliyat", "🧹 Temizlik", "🍫 Atıştırmalık", "✏️ Yeni Kategori Yaz"]
+        # 1. Varsayılan Kategoriler
+        VARSAYILAN_KATEGORILER = ["🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt & Kahvaltılık", "🍞 Gıda & Bakliyat", "🧹 Temizlik", "🍫 Atıştırmalık"]
+        
+        # 2. Veritabanından Öğrenilen Kategoriler
+        kayitli_kategoriler = set(df_market["Mesaj"].dropna().unique())
+        # Boşlukları ve gereksizleri temizle
+        kayitli_kategoriler = {k for k in kayitli_kategoriler if k and k != "Genel" and k != "None" and k != "✏️ Yeni Kategori Yaz"}
+        
+        # 3. Hepsini Birleştir ve Sırala
+        TUM_KATEGORILER = sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler))
+        TUM_KATEGORILER.append("✏️ Yeni Kategori Yaz")
         
         c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
-        with c2: st.selectbox("Kategori", KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
+        with c2: st.selectbox("Kategori", TUM_KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
         with c3: st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
         
-        # Eğer "Yeni Kategori Yaz" seçildiyse Input göster
         if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
             st.text_input("Yeni Kategori Adı:", key="market_kategori_yeni", placeholder="Örn: Tekne Malzemeleri")
 
         st.markdown("---")
         
-        df = st.session_state.local_df
-        df_market = df[df["Tip"] == "MARKET"]
-        
-        # Dinamik Kategorileri Bul (DB'deki mevcut kategoriler + Bizimkiler)
-        mevcut_kategoriler = set(KATEGORILER[:-1]) # Sonuncusu "Yeni Ekle" onu alma
-        mevcut_kategoriler.update(df_market["Mesaj"].unique())
-        mevcut_kategoriler.discard("") # Boşları at
-        mevcut_kategoriler.discard("✏️ Yeni Kategori Yaz")
-        
-        # AKTİF LİSTE
         alinacaklar = df_market[df_market["Durum"] == "0"]
         if alinacaklar.empty: st.success("Sepet Boş! 🎉")
         
-        # Gruplama Mantığı
-        sorted_cats = sorted(list(mevcut_kategoriler))
-        if "Genel" not in sorted_cats: sorted_cats.append("Genel") # Genel en sonda olsun
+        # GÖSTERİM (AÇILIR KAPANIR - EXPANDER)
+        # Kategorileri listele (Genel en sona gelsin)
+        kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
+        if "Genel" in kategori_listesi: 
+            kategori_listesi.remove("Genel")
+            kategori_listesi.append("Genel")
 
-        for kat in sorted_cats:
+        for kat in kategori_listesi:
+            # Filtreleme
             if kat == "Genel":
                 items = alinacaklar[(alinacaklar["Mesaj"] == "") | (alinacaklar["Mesaj"] == "Genel") | (alinacaklar["Mesaj"] == "None")]
             else:
                 items = alinacaklar[alinacaklar["Mesaj"] == kat]
             
             if not items.empty:
-                st.markdown(f"<div class='cat-header'>{kat}</div>", unsafe_allow_html=True)
-                for i, row in items.iterrows():
-                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                    with c1:
-                        if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                    with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
-
-        st.divider()
-        
-        # GEÇMİŞ (GRUP ODAKLI)
-        tamamlananlar = df_market[df_market["Durum"] == "1"]
-        with st.expander(f"📦 Geçmiş ({len(tamamlananlar)})"):
-            for kat in sorted_cats:
-                if kat == "Genel":
-                    items = tamamlananlar[(tamamlananlar["Mesaj"] == "") | (tamamlananlar["Mesaj"] == "Genel") | (tamamlananlar["Mesaj"] == "None")]
-                else:
-                    items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
-                
-                if not items.empty:
-                    st.markdown(f"**{kat}**")
+                # EXPANDER KULLANIMI: Açılır kapanır kutu
+                with st.expander(f"{kat} ({len(items)})", expanded=True):
                     for i, row in items.iterrows():
                         c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
                         with c1:
-                            if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
-                        with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
+                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
+                        with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
 
-    # --- İŞLER (KATEGORİLİ) ---
-    with tab2:
-        IS_KATEGORILER = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba", "✏️ Yeni Kategori Yaz"]
+        st.divider()
         
+        # GEÇMİŞ (AYRI EXPANDERLAR HALİNDE)
+        tamamlananlar = df_market[df_market["Durum"] == "1"]
+        with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
+            if tamamlananlar.empty:
+                st.info("Geçmiş boş.")
+            else:
+                for kat in kategori_listesi:
+                    if kat == "Genel":
+                        items = tamamlananlar[(tamamlananlar["Mesaj"] == "") | (tamamlananlar["Mesaj"] == "Genel") | (tamamlananlar["Mesaj"] == "None")]
+                    else:
+                        items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
+                    
+                    if not items.empty:
+                        st.markdown(f"**{kat}**")
+                        for i, row in items.iterrows():
+                            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                            with c1:
+                                if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
+                            with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
+                        st.divider()
+
+    # --- İŞLER (KATEGORİLİ & ÖĞRENEN) ---
+    with tab2:
+        df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
+        
+        # Varsayılan + Öğrenilen
+        VARSAYILAN_IS = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba"]
+        kayitli_is = set(df_todo["Mesaj"].dropna().unique())
+        kayitli_is = {k for k in kayitli_is if k and k != "Genel" and k != "None" and k != "✏️ Yeni Kategori Yaz"}
+        TUM_ISLER = sorted(list(set(VARSAYILAN_IS) | kayitli_is))
+        TUM_ISLER.append("✏️ Yeni Kategori Yaz")
+
         c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Görev", key="is_giris", label_visibility="collapsed", placeholder="Yapılacak iş...")
-        with c2: st.selectbox("Kategori", IS_KATEGORILER, key="is_kategori_secim", label_visibility="collapsed")
+        with c2: st.selectbox("Kategori", TUM_ISLER, key="is_kategori_secim", label_visibility="collapsed")
         with c3: st.button("EKLE", key="btn_t", on_click=is_ekleme_callback, use_container_width=True)
         
         if st.session_state.is_kategori_secim == "✏️ Yeni Kategori Yaz":
@@ -369,31 +358,23 @@ def sayfa_ana_ekran():
 
         st.markdown("---")
         
-        df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
-        
-        # Dinamik İş Kategorileri
-        is_cats = set(IS_KATEGORILER[:-1])
-        is_cats.update(df_todo["Mesaj"].unique())
-        is_cats.discard("")
-        is_cats.discard("✏️ Yeni Kategori Yaz")
-        
-        sorted_is_cats = sorted(list(is_cats))
-        if "Genel" not in sorted_is_cats: sorted_is_cats.append("Genel")
+        # İşleri Listele (Expander ile)
+        is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
+        if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
 
-        # İşleri Listele
-        for kat in sorted_is_cats:
+        for kat in is_listesi:
             if kat == "Genel":
-                items = df_todo[(df_todo["Durum"] == "0") & ((df_todo["Mesaj"] == "") | (df_todo["Mesaj"] == "Genel"))]
+                items = df_todo[(df_todo["Durum"] == "0") & ((df_todo["Mesaj"] == "") | (df_todo["Mesaj"] == "Genel") | (df_todo["Mesaj"] == "None"))]
             else:
                 items = df_todo[(df_todo["Durum"] == "0") & (df_todo["Mesaj"] == kat)]
             
             if not items.empty:
-                st.markdown(f"<div class='cat-header'>{kat}</div>", unsafe_allow_html=True)
-                for i, row in items.iterrows():
-                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                    with c1:
-                        if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                    with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
+                with st.expander(f"{kat} ({len(items)})", expanded=True):
+                    for i, row in items.iterrows():
+                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                        with c1:
+                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
+                        with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
 
     with tab3:
         with st.form("alarm"):
