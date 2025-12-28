@@ -15,64 +15,87 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Ev Paneli", page_icon="🏠", layout="centered")
 
 # ==============================================================================
-# GOOGLE SHEETS BAĞLANTISI (CACHE İLE HIZLANDIRILMIŞ)
+# GOOGLE SHEETS BAĞLANTISI
 # ==============================================================================
-@st.cache_resource
-def baglanti_getir():
-    """Bağlantıyı sadece bir kere kurar, her defasında tekrar bağlanmaz"""
+def baglanti_kur():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds_dict = dict(st.secrets["connections"]["gsheets"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    client = gspread.authorize(creds)
-    return client
-
-def veri_cek():
-    """Google Sheets'ten veriyi çeker ve DataFrame'e çevirir"""
-    client = baglanti_getir()
     try:
+        creds_dict = dict(st.secrets["connections"]["gsheets"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
         sheet = client.open(DOSYA_ADI).sheet1
-        data = sheet.get_all_records()
-        
-        # Eğer veri boşsa veya çekilemediyse boş tablo döndür
-        if not data:
-            return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman"])
-        
-        df = pd.DataFrame(data)
-        
-        # Sütun isimleri doğru mu kontrol et, değilse düzelt
-        gerekli_sutunlar = ["Urun", "Durum", "Mesaj", "Zaman"]
-        for col in gerekli_sutunlar:
-            if col not in df.columns:
-                df[col] = "" # Eksik sütunu ekle
-                
-        return df
+        return sheet
     except Exception as e:
-        # Hata durumunda (mesela dosya boşken) boş tablo dön
-        return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman"])
+        st.error(f"Bağlantı Hatası: {e}")
+        return None
 
-def satir_ekle(yeni_satir_listesi):
-    """Veriyi Google Sheets'e ekler"""
-    client = baglanti_getir()
-    sheet = client.open(DOSYA_ADI).sheet1
-    sheet.append_row(yeni_satir_listesi)
-    st.cache_data.clear() # Önbelleği temizle ki yeni veriyi görsün
+def verileri_hazirla():
+    """Tabloyu çeker, yeni sütun (Tip) yoksa ekler"""
+    sheet = baglanti_kur()
+    if not sheet: return pd.DataFrame()
 
-def hucre_guncelle(urun_adi, yeni_durum):
-    """Durumu günceller"""
-    client = baglanti_getir()
-    sheet = client.open(DOSYA_ADI).sheet1
     try:
-        hucre = sheet.find(urun_adi)
-        sheet.update_cell(hucre.row, 2, yeni_durum) # 2. Sütun (Durum)
-        st.cache_data.clear()
-    except: pass
+        data = sheet.get_all_values()
+        
+        # Sayfa boşsa başlıkları kur
+        if not data:
+            basliklar = ["Urun", "Durum", "Mesaj", "Zaman", "Tip"]
+            sheet.append_row(basliklar)
+            return pd.DataFrame(columns=basliklar)
+
+        # Başlık kontrolü
+        headers = data[0]
+        if "Tip" not in headers:
+            # Eski versiyondan geçiş: Tip sütunu ekle
+            sheet.update_cell(1, 5, "Tip") # E1 hücresi
+            # Var olan tüm satırlara 'MARKET' yaz
+            if len(data) > 1:
+                # Toplu güncelleme yapmak yerine boş bırakalım, kod 'MARKET' saysın
+                pass
+            data = sheet.get_all_values() # Tekrar çek
+
+        df = pd.DataFrame(data[1:], columns=data[0])
+        return df
+    except:
+        return pd.DataFrame()
 
 # ==============================================================================
-# BİLDİRİM
+# İŞLEMLER
 # ==============================================================================
+def urun_ekle(isim, tip):
+    """Tip: MARKET veya TODO"""
+    sheet = baglanti_kur()
+    if sheet:
+        # Urun, Durum(0), Mesaj, Zaman, Tip
+        sheet.append_row([isim, "0", "", "", tip])
+        st.cache_data.clear()
+
+def urun_sil(isim):
+    sheet = baglanti_kur()
+    if sheet:
+        try:
+            cell = sheet.find(isim)
+            sheet.delete_rows(cell.row)
+            st.cache_data.clear()
+        except: pass
+
+def durum_degistir(isim, yeni_durum):
+    sheet = baglanti_kur()
+    if sheet:
+        try:
+            cell = sheet.find(isim)
+            sheet.update_cell(cell.row, 2, str(yeni_durum))
+            st.cache_data.clear()
+        except: pass
+
+def alarm_ekle(mesaj, zaman):
+    sheet = baglanti_kur()
+    if sheet:
+        sheet.append_row(["", "-1", mesaj, zaman, "ALARM"])
+
 def bildirim_gonder(mesaj):
     try:
         requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
@@ -81,73 +104,135 @@ def bildirim_gonder(mesaj):
     except: pass
 
 # ==============================================================================
-# ARAYÜZ
+# YARDIMCI GÖRÜNÜM FONKSİYONU (LİSTELEYİCİ)
 # ==============================================================================
-st.markdown("<h3 style='text-align: center;'>🏠 Hızlı Ev Paneli</h3>", unsafe_allow_html=True)
+def liste_goster(dataframe, liste_tipi):
+    """Market ve Yapılacaklar için ortak görünüm fonksiyonu"""
+    # İlgili tipi filtrele (Tip sütunu boşsa Market say)
+    if liste_tipi == "MARKET":
+        df_aktif = dataframe[(dataframe["Tip"] == "MARKET") | (dataframe["Tip"] == "") | (dataframe["Tip"].isnull())]
+    else:
+        df_aktif = dataframe[dataframe["Tip"] == liste_tipi]
 
-# Veriyi yükle
-if 'df' not in st.session_state:
-    st.session_state.df = veri_cek()
+    if not df_aktif.empty:
+        alinacaklar = df_aktif[df_aktif["Durum"] == "0"]
+        tamamlananlar = df_aktif[df_aktif["Durum"] == "1"]
 
-# Sayfa her yenilendiğinde veriyi taze tutmaya çalış
-df = veri_cek()
+        # --- AKTİF LİSTE ---
+        st.subheader(f"📌 Bekleyenler ({len(alinacaklar)})")
+        
+        if alinacaklar.empty:
+            st.success("Liste tertemiz! 🎉")
+        
+        for index, row in alinacaklar.iterrows():
+            c1, c2 = st.columns([5, 1])
+            with c1:
+                # Checkbox
+                if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
+                    durum_degistir(row['Urun'], "1")
+                    st.rerun()
+            with c2:
+                # SİLME ONAY MEKANİZMASI
+                sil_key = f"del_btn_{liste_tipi}_{index}"
+                onay_key = f"confirm_{liste_tipi}_{index}"
 
-tab1, tab2 = st.tabs(["🛒 MARKET", "⏰ ALARM"])
+                # Eğer onay butonuna basılmadıysa çöp kutusunu göster
+                if not st.session_state.get(onay_key):
+                    if st.button("🗑️", key=sil_key):
+                        st.session_state[onay_key] = True
+                        st.rerun()
+                else:
+                    # Onay modundaysa kırmızı buton göster
+                    if st.button("Sil?", key=f"yes_{sil_key}", type="primary"):
+                        urun_sil(row['Urun'])
+                        st.session_state[onay_key] = False # Sıfırla
+                        st.rerun()
+                    # Vazgeçmek için sayfayı yenileyebilir veya boş bir yere tıklayabilir (Basit tuttum)
+                    st.caption("İptal: Sayfayı yenile")
+
+        st.divider()
+
+        # --- TAMAMLANANLAR ---
+        baslik = "📦 Evde Var / Geçmiş" if liste_tipi == "MARKET" else "✅ Tamamlanan İşler"
+        with st.expander(f"{baslik} ({len(tamamlananlar)})"):
+            if tamamlananlar.empty:
+                st.caption("Boş.")
+            else:
+                for index, row in tamamlananlar.iterrows():
+                    c_a, c_b = st.columns([4, 1])
+                    with c_a:
+                        if st.button(f"➕ {row['Urun']}", key=f"back_{liste_tipi}_{index}", use_container_width=True):
+                            durum_degistir(row['Urun'], "0")
+                            st.rerun()
+                    with c_b:
+                        # Burada da silme onayı olsun
+                        sil_key_t = f"del_fin_{liste_tipi}_{index}"
+                        onay_key_t = f"conf_fin_{liste_tipi}_{index}"
+                        
+                        if not st.session_state.get(onay_key_t):
+                            if st.button("🗑️", key=sil_key_t):
+                                st.session_state[onay_key_t] = True
+                                st.rerun()
+                        else:
+                            if st.button("Sil?", key=f"yes_{sil_key_t}", type="primary"):
+                                urun_sil(row['Urun'])
+                                st.session_state[onay_key_t] = False
+                                st.rerun()
+    else:
+        st.info("Henüz bir şey eklenmemiş.")
+
+# ==============================================================================
+# ANA ARAYÜZ
+# ==============================================================================
+st.markdown("<h3 style='text-align: center;'>🏠 Yunus Hocam'ın Asistanı</h3>", unsafe_allow_html=True)
+
+df = verileri_hazirla()
+
+# 3 SEKME YAPTIK
+tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 YAPILACAKLAR", "⏰ ALARM"])
 
 # --- TAB 1: MARKET ---
 with tab1:
     col1, col2 = st.columns([3, 1])
     with col1:
-        yeni = st.text_input("Hızlı Ekle", placeholder="Ürün adı...", label_visibility="collapsed")
+        yeni_market = st.text_input("Market Ürünü Ekle", placeholder="Süt, Ekmek...", label_visibility="collapsed", key="input_market")
     with col2:
-        if st.button("EKLE", use_container_width=True):
-            if yeni:
-                # Anında Ekranda Göster (Hız Hilesi)
-                st.info("Ekleniyor...")
-                satir_ekle([yeni, 0, "", ""])
+        if st.button("EKLE", key="btn_add_market", use_container_width=True):
+            if yeni_market:
+                urun_ekle(yeni_market, "MARKET")
+                st.success("Eklendi")
+                time.sleep(0.5)
                 st.rerun()
+    
+    st.markdown("---")
+    liste_goster(df, "MARKET")
 
-    st.divider()
-
-    # Dataframe boş değilse işlemleri yap
-    if not df.empty and "Durum" in df.columns:
-        # Durum sütununu sayıya çevirmeyi garantiye al
-        df['Durum'] = pd.to_numeric(df['Durum'], errors='coerce').fillna(0)
-        
-        alinacaklar = df[df["Durum"] == 0]
-        evde_var = df[df["Durum"] == 1]
-
-        st.subheader(f"📌 Alınacaklar ({len(alinacaklar)})")
-        
-        # Checkboxlar
-        for index, row in alinacaklar.iterrows():
-            if st.checkbox(f"**{row['Urun']}**", key=f"chk_{index}"):
-                hucre_guncelle(row['Urun'], 1)
-                st.rerun()
-
-        st.divider()
-
-        # Evde Var Kutusu
-        with st.expander(f"📦 Evde Var / Geçmiş ({len(evde_var)})"):
-            if not evde_var.empty:
-                cols = st.columns(3)
-                for i, (index, row) in enumerate(evde_var.iterrows()):
-                    with cols[i % 3]:
-                        if st.button(f"➕ {row['Urun']}", key=f"btn_{index}"):
-                            hucre_guncelle(row['Urun'], 0)
-                            st.rerun()
-    else:
-        st.warning("Liste şu an boş veya yükleniyor. İlk ürününü ekle!")
-
-# --- TAB 2: ALARM ---
+# --- TAB 2: YAPILACAKLAR (YENİ!) ---
 with tab2:
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        yeni_todo = st.text_input("İş Ekle", placeholder="Fatura öde, Arabayı yıka...", label_visibility="collapsed", key="input_todo")
+    with col2:
+        if st.button("EKLE", key="btn_add_todo", use_container_width=True):
+            if yeni_todo:
+                urun_ekle(yeni_todo, "TODO")
+                st.success("Eklendi")
+                time.sleep(0.5)
+                st.rerun()
+    
+    st.markdown("---")
+    liste_goster(df, "TODO")
+
+# --- TAB 3: ALARM ---
+with tab3:
+    st.info("Süre dolunca bildirim gelir.")
     with st.form("alarm_form"):
         mesaj = st.text_input("Not", placeholder="Fırını kapat")
         sure = st.number_input("Dakika", min_value=1, value=15)
-        if st.form_submit_button("Kaydet"):
+        
+        if st.form_submit_button("🔔 Alarmı Kur", use_container_width=True):
             hedef = datetime.now() + timedelta(minutes=sure)
             hedef_str = hedef.strftime("%Y-%m-%d %H:%M:%S")
-            
-            satir_ekle(["", -1, mesaj, hedef_str])
+            alarm_ekle(mesaj, hedef_str)
             bildirim_gonder(f"✅ Alarm kuruldu: {sure} dk sonra '{mesaj}'")
             st.success("Kaydedildi!")
