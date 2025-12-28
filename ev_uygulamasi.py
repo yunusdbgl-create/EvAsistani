@@ -19,12 +19,15 @@ except ImportError:
     GRAFIK_VAR = False
 
 # ==============================================================================
-# 🔐 GİZLİ TUYA VE AYARLAR (SENİN ŞİFRELERİN)
+# 🔐 GİZLİ TUYA VE AYARLAR (LÜTFEN BURAYI SİTEDEN KONTROL ET VE YENİLE)
 # ==============================================================================
-TUYA_ACCESS_ID = "d3xnudf48p7knkadqe35"
-TUYA_ACCESS_SECRET = "cf5adc62eccc41a8b18d65a4dcd51821"
-MAMA_KABI_1_ID = "eb3ebfbf640898596ea4yk"
-MAMA_KABI_2_ID = "eba49fe3029896e87drx10"
+# Hata 1004 alıyorsan, Access Secret hatalı demektir. Siteden tekrar kopyala.
+TUYA_ACCESS_ID = "d3xnudf48p7knkadqe35".strip() 
+TUYA_ACCESS_SECRET = "cf5adc62eccc41a8b18d65a4dcd51821".strip() 
+
+# Cihaz ID'leri (Bunlar genelde değişmez ama kontrol etmekte fayda var)
+MAMA_KABI_1_ID = "eb3ebfbf640898596ea4yk".strip()
+MAMA_KABI_2_ID = "eba49fe3029896e87drx10".strip()
 
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
@@ -74,47 +77,39 @@ def get_kategori_renk(kategori):
     return "#34495e"
 
 # ==============================================================================
-# TUYA BULUT BAĞLANTISI (AKILLI BÖLGE SEÇİMİ)
+# TUYA BULUT BAĞLANTISI (BÖLGE KİLİTLİ - AMERİKA)
 # ==============================================================================
 class TuyaCloud:
     def __init__(self, access_id, access_secret):
         self.access_id = access_id
         self.access_secret = access_secret
-        # Hem Amerika hem Avrupa'yı deneyecek
-        self.endpoints = ["https://openapi.tuyaus.com", "https://openapi.tuyaeu.com"]
-        self.current_endpoint = self.endpoints[0]
-
-    def _calculate_sign(self, t, method, url, body_str=""):
-        string_to_sign = self.access_id + t
-        sign = hmac.new(self.access_secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest().upper()
-        return sign
+        # Kesin olarak Amerikan sunucusu (Hesabı US açtığımız için)
+        self.endpoint = "https://openapi.tuyaus.com"
 
     def _get_token(self):
+        # Tuya v1.0 Token İmzası
         t = str(int(time.time() * 1000))
-        sign = self._calculate_sign(t, "GET", "/v1.0/token")
+        sign_str = self.access_id + t
+        sign = hmac.new(self.access_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+        
         headers = {'client_id': self.access_id, 'sign': sign, 't': t, 'sign_method': 'HMAC-SHA256'}
-        
-        # Tüm bölgeleri dene
-        for endpoint in self.endpoints:
-            try:
-                response = requests.get(f"{endpoint}/v1.0/token?grant_type=1", headers=headers)
-                res = response.json()
-                if res.get('success'):
-                    self.current_endpoint = endpoint # Çalışan bölgeyi kaydet
-                    return res['result']['access_token'], None
-                else:
-                    error_msg = f"Hata: {res.get('code')} - {res.get('msg')}"
-            except Exception as e:
-                error_msg = str(e)
-        
-        return None, error_msg
+        try:
+            response = requests.get(f"{self.endpoint}/v1.0/token?grant_type=1", headers=headers)
+            res = response.json()
+            if res.get('success'):
+                return res['result']['access_token'], None
+            else:
+                return None, f"Hata {res.get('code')}: {res.get('msg')} (Büyük ihtimalle Secret yanlış)"
+        except Exception as e:
+            return None, str(e)
 
     def send_command(self, device_id, commands):
         token, error = self._get_token()
         if not token: 
-            return False, f"Token Yok! ({error}). Tuya sitesinden 'IoT Core' servisini açtın mı?"
+            return False, f"Bağlantı Kurulamadı: {error}"
         
         t = str(int(time.time() * 1000))
+        # Basit İmza
         string_to_sign = self.access_id + token + t + f"POST\n\n\n\n/v1.0/devices/{device_id}/commands"
         sign = hmac.new(self.access_secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest().upper()
 
@@ -124,7 +119,7 @@ class TuyaCloud:
         }
         payload = {'commands': commands}
         try:
-            response = requests.post(f"{self.current_endpoint}/v1.0/devices/{device_id}/commands", headers=headers, data=json.dumps(payload))
+            response = requests.post(f"{self.endpoint}/v1.0/devices/{device_id}/commands", headers=headers, data=json.dumps(payload))
             res = response.json()
             if res.get('success'): return True, "Başarılı"
             else: return False, f"Tuya Hatası: {res.get('code')} - {res.get('msg')}"
