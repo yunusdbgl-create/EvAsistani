@@ -5,7 +5,6 @@ from google.oauth2.service_account import Credentials
 import requests
 import time
 from datetime import datetime, timedelta
-import threading
 
 # ==============================================================================
 # AYARLAR
@@ -16,63 +15,63 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Ev Paneli", page_icon="🏠", layout="centered")
 
 # ==============================================================================
-# GOOGLE SHEETS BAĞLANTISI (DÜZELTİLDİ)
+# GOOGLE SHEETS BAĞLANTISI (CACHE İLE HIZLANDIRILMIŞ)
 # ==============================================================================
-def baglanti_kur():
-    # DÜZELTME BURADA: Sadece spreadsheets yetmez, Drive izni de lazımdı.
+@st.cache_resource
+def baglanti_getir():
+    """Bağlantıyı sadece bir kere kurar, her defasında tekrar bağlanmaz"""
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    
+    creds_dict = dict(st.secrets["connections"]["gsheets"])
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    client = gspread.authorize(creds)
+    return client
+
+def veri_cek():
+    """Google Sheets'ten veriyi çeker ve DataFrame'e çevirir"""
+    client = baglanti_getir()
     try:
-        # Secrets verisini al
-        creds_dict = dict(st.secrets["connections"]["gsheets"])
-        
-        # Yetkilendirmeyi yap
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-        client = gspread.authorize(creds)
-        
-        # Dosyayı aç
         sheet = client.open(DOSYA_ADI).sheet1
-        return sheet
-    except Exception as e:
-        st.error(f"Hata! Dosya bulunamadı veya yetki yetmedi. Detay: {e}")
-        return None
-
-# ==============================================================================
-# VERİ İŞLEMLERİ
-# ==============================================================================
-def verileri_getir():
-    sheet = baglanti_kur()
-    if sheet:
         data = sheet.get_all_records()
+        
+        # Eğer veri boşsa veya çekilemediyse boş tablo döndür
         if not data:
-            sheet.append_row(["Urun", "Durum", "Mesaj", "Zaman"])
             return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman"])
-        return pd.DataFrame(data)
-    return pd.DataFrame()
+        
+        df = pd.DataFrame(data)
+        
+        # Sütun isimleri doğru mu kontrol et, değilse düzelt
+        gerekli_sutunlar = ["Urun", "Durum", "Mesaj", "Zaman"]
+        for col in gerekli_sutunlar:
+            if col not in df.columns:
+                df[col] = "" # Eksik sütunu ekle
+                
+        return df
+    except Exception as e:
+        # Hata durumunda (mesela dosya boşken) boş tablo dön
+        return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman"])
 
-def urun_ekle(isim):
-    sheet = baglanti_kur()
-    if sheet:
-        sheet.append_row([isim, 0, "", ""])
+def satir_ekle(yeni_satir_listesi):
+    """Veriyi Google Sheets'e ekler"""
+    client = baglanti_getir()
+    sheet = client.open(DOSYA_ADI).sheet1
+    sheet.append_row(yeni_satir_listesi)
+    st.cache_data.clear() # Önbelleği temizle ki yeni veriyi görsün
 
-def urun_durum_degistir(isim, yeni_durum):
-    sheet = baglanti_kur()
-    if sheet:
-        try:
-            hucre = sheet.find(isim)
-            sheet.update_cell(hucre.row, 2, yeni_durum)
-        except: pass
-
-def alarm_ekle(mesaj, zaman):
-    sheet = baglanti_kur()
-    if sheet:
-        sheet.append_row(["", -1, mesaj, zaman])
+def hucre_guncelle(urun_adi, yeni_durum):
+    """Durumu günceller"""
+    client = baglanti_getir()
+    sheet = client.open(DOSYA_ADI).sheet1
+    try:
+        hucre = sheet.find(urun_adi)
+        sheet.update_cell(hucre.row, 2, yeni_durum) # 2. Sütun (Durum)
+        st.cache_data.clear()
+    except: pass
 
 # ==============================================================================
-# BİLDİRİM SİSTEMİ
+# BİLDİRİM
 # ==============================================================================
 def bildirim_gonder(mesaj):
     try:
@@ -84,12 +83,16 @@ def bildirim_gonder(mesaj):
 # ==============================================================================
 # ARAYÜZ
 # ==============================================================================
-st.markdown("<h2 style='text-align: center;'>🏠 Bulut Ev Paneli</h2>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center;'>🏠 Hızlı Ev Paneli</h3>", unsafe_allow_html=True)
+
+# Veriyi yükle
+if 'df' not in st.session_state:
+    st.session_state.df = veri_cek()
+
+# Sayfa her yenilendiğinde veriyi taze tutmaya çalış
+df = veri_cek()
 
 tab1, tab2 = st.tabs(["🛒 MARKET", "⏰ ALARM"])
-
-# Verileri Çek
-df = verileri_getir()
 
 # --- TAB 1: MARKET ---
 with tab1:
@@ -99,37 +102,42 @@ with tab1:
     with col2:
         if st.button("EKLE", use_container_width=True):
             if yeni:
-                urun_ekle(yeni)
-                st.success("Eklendi!")
-                time.sleep(1)
+                # Anında Ekranda Göster (Hız Hilesi)
+                st.info("Ekleniyor...")
+                satir_ekle([yeni, 0, "", ""])
                 st.rerun()
 
     st.divider()
 
+    # Dataframe boş değilse işlemleri yap
     if not df.empty and "Durum" in df.columns:
-        # Alınacaklar (Durum 0)
+        # Durum sütununu sayıya çevirmeyi garantiye al
+        df['Durum'] = pd.to_numeric(df['Durum'], errors='coerce').fillna(0)
+        
         alinacaklar = df[df["Durum"] == 0]
         evde_var = df[df["Durum"] == 1]
 
         st.subheader(f"📌 Alınacaklar ({len(alinacaklar)})")
         
+        # Checkboxlar
         for index, row in alinacaklar.iterrows():
             if st.checkbox(f"**{row['Urun']}**", key=f"chk_{index}"):
-                urun_durum_degistir(row['Urun'], 1)
+                hucre_guncelle(row['Urun'], 1)
                 st.rerun()
 
         st.divider()
 
+        # Evde Var Kutusu
         with st.expander(f"📦 Evde Var / Geçmiş ({len(evde_var)})"):
             if not evde_var.empty:
                 cols = st.columns(3)
                 for i, (index, row) in enumerate(evde_var.iterrows()):
                     with cols[i % 3]:
                         if st.button(f"➕ {row['Urun']}", key=f"btn_{index}"):
-                            urun_durum_degistir(row['Urun'], 0)
+                            hucre_guncelle(row['Urun'], 0)
                             st.rerun()
     else:
-        st.info("Liste yükleniyor...")
+        st.warning("Liste şu an boş veya yükleniyor. İlk ürününü ekle!")
 
 # --- TAB 2: ALARM ---
 with tab2:
@@ -140,7 +148,6 @@ with tab2:
             hedef = datetime.now() + timedelta(minutes=sure)
             hedef_str = hedef.strftime("%Y-%m-%d %H:%M:%S")
             
-            alarm_ekle(mesaj, hedef_str)
-            
-            st.success(f"Not alındı! ({hedef.strftime('%H:%M')})")
+            satir_ekle(["", -1, mesaj, hedef_str])
             bildirim_gonder(f"✅ Alarm kuruldu: {sure} dk sonra '{mesaj}'")
+            st.success("Kaydedildi!")
