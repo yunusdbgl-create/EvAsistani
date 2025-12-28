@@ -14,9 +14,9 @@ import io
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
-st.set_page_config(page_title="Yunus Hoca'nın Paneli", page_icon="📱", layout="centered")
+st.set_page_config(page_title="Ev Asistanı Pro", page_icon="📱", layout="centered")
 
-# --- CSS (Mobil Uyum + Tasarım) ---
+# --- CSS (Mobil Uyum) ---
 st.markdown("""
 <style>
     /* Sütunları yan yana zorla */
@@ -32,39 +32,31 @@ st.markdown("""
     button {
         padding: 0.25rem 0.5rem !important;
     }
-    /* Hava Durumu Kutusu */
-    .weather-box {
-        padding: 10px;
-        background-color: #f0f2f6;
+    /* Hava Durumu Çerçevesi */
+    .weather-frame {
+        width: 100%;
+        height: 150px;
+        border: none;
         border-radius: 10px;
-        text-align: center;
-        margin-bottom: 20px;
-        border: 1px solid #d6d6d6;
+        overflow: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# HAVA DURUMU FONKSİYONU (WIDGET)
+# HAVA DURUMU (IFRAME YÖNTEMİ - KESİN ÇÖZÜM)
 # ==============================================================================
 def hava_durumu_goster():
-    """Basit ve API gerektirmeyen hava durumu (wttr.in)"""
-    try:
-        # İstanbul için Türkçe ve tek satır formatı
-        url = "https://wttr.in/Istanbul?format=%C+%t&lang=tr"
-        response = requests.get(url, timeout=2)
-        durum = response.text.strip()
-        
-        st.markdown(f"""
-        <div class="weather-box">
-            <h4>🌤️ İstanbul: {durum}</h4>
-        </div>
-        """, unsafe_allow_html=True)
-    except:
-        st.caption("Hava durumu yüklenemedi.")
+    """Hava durumunu sunucudan değil, direkt tarayıcıdan çeker"""
+    # wttr.in sitesini bir pencere gibi gömeriz
+    st.markdown("""
+        <iframe class="weather-frame" 
+        src="https://wttr.in/Istanbul?lang=tr&format=3&m" 
+        scrolling="no"></iframe>
+    """, unsafe_allow_html=True)
 
 # ==============================================================================
-# ARKA PLAN İŞÇİLERİ (ESKİ KODLARIN AYNI)
+# ARKA PLAN İŞÇİLERİ
 # ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -268,7 +260,7 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM PARÇALARI (SİLME BUTONU VS)
+# GÖRÜNÜM PARÇALARI
 # ==============================================================================
 def silme_butonu_koy(key_prefix, urun_adi):
     sil_key = f"del_{key_prefix}_{urun_adi}"
@@ -286,7 +278,7 @@ def silme_butonu_koy(key_prefix, urun_adi):
         st.caption("İptal: Yenile")
 
 # ==============================================================================
-# 1. SAYFA: EV ASİSTANI (SENİN ESKİ SİSTEM)
+# 1. SAYFA: EV ASİSTANI
 # ==============================================================================
 def sayfa_ev_asistani():
     if st.button("🔄 Verileri Yenile", use_container_width=True):
@@ -303,7 +295,6 @@ def sayfa_ev_asistani():
         with c2:
             st.button("EKLE", key="btn_m", on_click=ekleme_callback, args=("market_giris", "MARKET"), use_container_width=True)
         st.markdown("---")
-        # Liste Gösterimi (Market)
         df = st.session_state.local_df
         mask = (df["Tip"] == "MARKET") | (df["Tip"] == "") | (df["Tip"] == "None")
         df_aktif = df[mask]
@@ -339,7 +330,6 @@ def sayfa_ev_asistani():
         with c2:
             st.button("EKLE", key="btn_t", on_click=ekleme_callback, args=("is_giris", "TODO"), use_container_width=True)
         st.markdown("---")
-        # Liste Gösterimi (Todo)
         df_t = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
         alinacaklar = df_t[df_t["Durum"] == "0"]
         tamamlananlar = df_t[df_t["Durum"] == "1"]
@@ -376,7 +366,6 @@ def sayfa_ev_asistani():
             st.button("KAYDET", key="btn_f", on_click=fatura_callback, use_container_width=True)
         st.markdown("---")
         
-        # Ödeme Listesi
         df_fatura = st.session_state.local_df[st.session_state.local_df["Tip"] == "FATURA"]
         if not df_fatura.empty:
             bugun = datetime.now().day
@@ -414,7 +403,6 @@ def sayfa_ev_asistani():
                 st.write("")
                 st.button("KAYDET", key="btn_b", on_click=butce_callback, use_container_width=True)
         st.markdown("---")
-        # Bütçe Gösterimi
         df_butce = st.session_state.local_df[st.session_state.local_df["Tip"] == "BUTCE"].copy()
         if not df_butce.empty:
             df_butce["TarihObj"] = pd.to_datetime(df_butce["Zaman"], errors='coerce').fillna(datetime.now())
@@ -496,43 +484,43 @@ def sayfa_ev_asistani():
                 except: pass
 
 # ==============================================================================
-# 2. SAYFA: DOSYA ÇEVİRİCİ BOT (YENİ ÖZELLİK)
+# 2. SAYFA: DOSYA ÇEVİRİCİ (YENİLENMİŞ)
 # ==============================================================================
 def sayfa_dosya_cevirici():
     st.subheader("📂 Dosya Çevirici Bot (PDF)")
-    st.info("💡 Word, Excel veya Resim dosyalarını buraya yükleyip PDF'e çevirebilirsin.")
+    st.info("💡 Word, Excel, PowerPoint veya Resim dosyalarını buraya yükleyebilirsin.")
     
-    dosya = st.file_uploader("Dosya Yükle", type=["png", "jpg", "jpeg"])
+    # YENİ: Genişletilmiş dosya tipleri
+    dosya = st.file_uploader("Dosya Yükle", type=["png", "jpg", "jpeg", "docx", "xlsx", "pptx"])
     
     if dosya:
         st.success(f"✅ {dosya.name} yüklendi!")
+        
         if st.button("PDF'e Çevir"):
-            try:
-                # Basit Resim -> PDF Çevirici (Örnek)
-                import img2pdf
-                pdf_bytes = img2pdf.convert(dosya.read())
-                
-                st.download_button(
-                    label="⬇️ PDF İndir",
-                    data=pdf_bytes,
-                    file_name=f"{dosya.name}.pdf",
-                    mime="application/pdf"
-                )
-            except Exception as e:
-                st.error(f"Hata oluştu: {e}")
-                st.warning("Not: Şu an sadece resim dosyaları destekleniyor. Word/Excel desteği yakında!")
+            # Resim ise çevir (Çünkü kütüphanesi basit)
+            if dosya.type in ["image/png", "image/jpeg", "image/jpg"]:
+                try:
+                    import img2pdf
+                    pdf_bytes = img2pdf.convert(dosya.read())
+                    st.download_button("⬇️ İndir", pdf_bytes, f"{dosya.name}.pdf", "application/pdf")
+                except Exception as e: st.error(f"Hata: {e}")
+            
+            # Office dosyası ise (docx, xlsx, pptx)
+            else:
+                st.warning("⚠️ Word/Excel çevirisi için sunucu tarafında Microsoft Office lisansı gereklidir.")
+                st.info("Bu özellik şu an 'Demo' modundadır. İleride CloudConvert API ile aktif edilebilir.")
 
 # ==============================================================================
-# ANA İSKELET (MENÜ VE YÖNLENDİRME)
+# ANA İSKELET
 # ==============================================================================
 
-# 1. En Üstte Hava Durumu
+# 1. En Üst: Hava Durumu (Iframe)
 hava_durumu_goster()
 
-# 2. Sol Menü (Sidebar)
+# 2. Sol Menü
 secim = st.sidebar.radio("Menü", ["🏠 Ev Asistanı", "📂 Dosya Çevirici"])
 
-# 3. Sayfa Yönlendirme
+# 3. Yönlendirme
 if secim == "🏠 Ev Asistanı":
     sayfa_ev_asistani()
 elif secim == "📂 Dosya Çevirici":
