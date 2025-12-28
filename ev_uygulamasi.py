@@ -30,13 +30,22 @@ st.markdown("""
     div[data-testid="column"] { display: flex; align-items: center; height: 100%; }
     button { padding: 0.25rem 0.5rem !important; }
     
+    /* Karşılama Kutusu */
     .welcome-box {
         background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
         color: #2c3e50; padding: 15px; border-radius: 15px;
         text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
+    .prenses-box {
+        background: linear-gradient(120deg, #fccb90 0%, #d57eeb 100%);
+        color: #4a235a; padding: 15px; border-radius: 15px;
+        text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        border: 2px solid #fff;
+    }
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; font-style: italic; }
+    
+    /* Kategori Rozetleri */
     .cat-badge {
         display: inline-block; padding: 4px 12px; border-radius: 12px;
         color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
@@ -58,6 +67,48 @@ def get_kategori_renk(kategori):
     for key, color in renkler.items():
         if key in kategori: return color
     return "#34495e"
+
+# ==============================================================================
+# SÜRPRİZ VE PRENSES VERİTABANI
+# ==============================================================================
+def ask_kavanozu_sozleri():
+    return [
+        "Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", 
+        "Akşam çayı benden!", "Senin gülüşün güneşten daha parlak.", "Dünyanın en şanslı adamı benim.",
+        "Bir kahve molası verelim mi?", "Seni seviyorum, hem de çok!", "Bugün senin günün olsun.",
+        "Akşama en sevdiğin filmi izleyelim.", "Yemekler senden, bulaşıklar benden (şaka şaka).",
+        "Seninle yaşlanmak istiyorum.", "Gözlerinin içi gülüyor bugün.", "Harika bir eşsin.",
+        "Evin neşesi sensin.", "Bugün kendine bir güzellik yap.", "Seninle tartışmayı bile seviyorum.",
+        "Hayat arkadaşım, can yoldaşım.", "Sana sarılmak bütün yorgunluğumu alıyor.",
+        "Mesafeler engel değil, kalbim seninle.", "Seninle geçen her dakika kıymetli.",
+        "Prenses bile seni benden çok seviyor olabilir.", "Bugün gökyüzü senin için mavi.",
+        "En güzel manzaram sensin.", "Senin elinden zehir olsa yerim.", "Kalbimin tek sahibi.",
+        "Bu mesajı okuduysan bana bir öpücük borçlusun.", "Seni düşünmek bile yüzümü güldürüyor.",
+        "Dünyadaki en güzel tesadüfümsün.", "Seninle her yere gelirim.", "Birlikte başarabiliriz.",
+        "Bugün çok yoruldun, dinlenmeyi hak ettin.", "Sen benim evimsin.", "Huzurumsun.",
+        "Seni ilk gördüğüm günü hatırlıyorum.", "Aşkımız her geçen gün büyüyor.",
+        "Seninle kavga etmeyi bile özlüyorum.", "Benim süper kahramanım sensin.",
+        "Gülmek sana çok yakışıyor.", "Seninle sonsuza kadar...", "İyi ki varsın sevgilim.",
+        "Hayallerimin ortağısın.", "Sen olmasan bu ev çok sessiz olurdu.", "Seni çok özledim.",
+        "Akşama sürpriz var mı? (Yoksa ben yapayım)", "Seninle her şey mümkün.",
+        "Bugün prenses gibi hissediyor musun?", "Senin mutsuz olmana dayanamam.",
+        "Sadece seninle...", "Her şey seninle anlamlı."
+        # Listeyi 100'e tamamlayacak kadar çoğaltılabilir, şimdilik 50 tane örnek.
+    ]
+
+def prenses_sozleri():
+    return [
+        "🐈 Prenses: Mama kabım boşken bu uygulamada ne geziyorsun?",
+        "🐈 Prenses: Yunus'a söyle, o koltuk benim.",
+        "🐈 Prenses: Beni sevmeyi unuttunuz mu?",
+        "🐈 Prenses: Bugün çok tüy döktüm, süpürgeyi çalıştırın.",
+        "🐈 Prenses: Akşama balık mı var? Bana da ayırın.",
+        "🐈 Prenses: Evin gerçek sahibi benim, siz sadece kiracısınız.",
+        "🐈 Prenses: Şu an uyuyorum, beni rahatsız etmeyin.",
+        "🐈 Prenses: Yaş mama günü ne zamandı?",
+        "🐈 Prenses: Sizi izliyorum...",
+        "🐈 Prenses: Miyav! (Tercümesi: Beni sevin!)"
+    ]
 
 # ==============================================================================
 # AI MUTFAK ŞEFİ MOTORU
@@ -92,17 +143,23 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
     return tam, eksik, list(tum_malzemeler)
 
 # ==============================================================================
-# KARŞILAMA
+# KARŞILAMA (PRENSES MODLU)
 # ==============================================================================
 def karsilama_paneli():
-    saat = datetime.now().hour
-    selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
-    sozler = [
-        "🏡 Evimiz kalemizdir.", "💡 Yemekler artık kendi menüsünde!",
-        "🐈 Prenses'e selamlar!", "❤️ Günlük rutinlerini tamamladın mı?",
-        "🛒 Alınacaklar listesi seni bekliyor.", "👨‍🍳 Şef bugün ne pişirsek diyor?"
-    ]
-    st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
+    # %30 İhtimalle Prenses Konuşur
+    if random.random() < 0.30:
+        soz = random.choice(prenses_sozleri())
+        st.markdown(f'<div class="prenses-box"><div class="welcome-title">🐾 MİYAV!</div><div class="welcome-note">{soz}</div></div>', unsafe_allow_html=True)
+    else:
+        # Normal Karşılama
+        saat = datetime.now().hour
+        selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
+        sozler = [
+            "🏡 Evimiz kalemizdir.", "💡 Yemekler artık kendi menüsünde!",
+            "❤️ Bugün harika bir gün olacak.", "🛒 Eksikleri anında yaz ki unutulmasın.",
+            "👨‍🍳 Şef de emrinizde, Çark da!"
+        ]
+        st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # ARKA PLAN VE VERİTABANI
@@ -298,7 +355,6 @@ def dashboard_goster():
     # Market Sepeti
     sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
 
-    # SADECE 2 KUTU (VARLIK GİZLENDİ)
     c1, c2 = st.columns(2)
     c1.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
     c2.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
@@ -308,6 +364,13 @@ def dashboard_goster():
 # SAYFALAR
 # ==============================================================================
 def sayfa_ana_ekran():
+    # SÜRPRİZ BUTONU
+    if st.button("🎁 Bana Bir Sürpriz Yap", type="primary", use_container_width=True):
+        st.balloons()
+        soz = random.choice(ask_kavanozu_sozleri())
+        st.success(f"💌 {soz}")
+        time.sleep(3)
+
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
     
     with tab1:
@@ -487,12 +550,36 @@ def sayfa_ekonomi():
 # YENİ MENÜ: YEMEKLER
 # ==============================================================================
 def sayfa_yemekler():
-    tab1, tab2, tab3 = st.tabs(["🎡 KAHVALTI", "🎡 YEMEK", "👨‍🍳 AI ŞEF"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🔥 EŞLEŞME", "🎡 KAHVALTI", "🎡 YEMEK", "👨‍🍳 AI ŞEF"])
     
     with st.expander("⚙️ Temizlik"):
         if st.button("🧹 Çift Kayıtları Temizle", use_container_width=True): listeyi_temizle()
 
+    # OYUN MODU
     with tab1:
+        st.caption("Tinder usulü yemek seçimi! Kararsız kaldığınızda kullanın.")
+        df_oyun = st.session_state.local_df[(st.session_state.local_df["Tip"].isin(["YEMEK_OGUN", "YEMEK_KAHVALTI"])) & (st.session_state.local_df["Durum"] == "1")]
+        yemek_listesi = df_oyun["Urun"].tolist()
+        
+        if not yemek_listesi:
+            st.warning("Önce Çark kısmından yemek ekleyin!")
+        else:
+            if 'oyun_yemegi' not in st.session_state:
+                st.session_state.oyun_yemegi = random.choice(yemek_listesi)
+            
+            st.markdown(f"<h2 style='text-align: center;'>🍽️ {st.session_state.oyun_yemegi} 🍽️</h2>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            c1, c2 = st.columns(2)
+            if c1.button("👎 Olmaz", use_container_width=True):
+                st.session_state.oyun_yemegi = random.choice(yemek_listesi)
+                st.rerun()
+            
+            if c2.button("👍 Olur", type="primary", use_container_width=True):
+                st.balloons()
+                st.success(f"HARİKA! Akşama {st.session_state.oyun_yemegi} var! Afiyet olsun.")
+
+    with tab2:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Kahvaltı Ekle", key="kahvalti_giris", label_visibility="collapsed")
         with c2: st.button("EKLE", key="btn_kahvalti", on_click=yemek_ekle_callback, args=("kahvalti_giris", "YEMEK_KAHVALTI"), use_container_width=True)
@@ -512,7 +599,7 @@ def sayfa_yemekler():
                     if chk: hizli_durum_degistir(row['Urun'], "0")
             with c2: silme_butonu_koy(f"k_del_{i}", row['Urun'])
 
-    with tab2:
+    with tab3:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Yemek Ekle", key="yemek_giris", label_visibility="collapsed")
         with c2: st.button("EKLE", key="btn_yemek", on_click=yemek_ekle_callback, args=("yemek_giris", "YEMEK_OGUN"), use_container_width=True)
@@ -532,7 +619,7 @@ def sayfa_yemekler():
                     if chk: hizli_durum_degistir(row['Urun'], "0")
             with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
 
-    with tab3:
+    with tab4:
         st.subheader("👨‍🍳 AI Mutfak Şefi")
         df = st.session_state.local_df
         marketten_gelenler = df[(df["Tip"] == "MARKET") & (df["Durum"] == "1")]["Urun"].tolist()
