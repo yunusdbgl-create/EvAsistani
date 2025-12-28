@@ -8,12 +8,33 @@ from datetime import datetime, timedelta, time as dt_time
 import threading
 
 # ==============================================================================
-# AYARLAR
+# AYARLAR VE TASARIM
 # ==============================================================================
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
 st.set_page_config(page_title="Ev Asistanı Pro", page_icon="🏠", layout="centered")
+
+# --- MOBİL İÇİN ÖZEL CSS (SÜTUNLARI YAN YANA ZORLAR) ---
+st.markdown("""
+<style>
+    /* Sütunların mobilde alt alta inmesini engelle */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        gap: 5px !important; /* Aradaki boşluğu azalt */
+    }
+    /* Checkbox ve Butonları dikeyde ortala */
+    div[data-testid="column"] {
+        display: flex;
+        align-items: center;
+        height: 100%;
+    }
+    /* Mobil görünümde butonları biraz küçült */
+    button {
+        padding: 0.25rem 0.5rem !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
 # ARKA PLAN İŞÇİLERİ
@@ -220,7 +241,7 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM BİLEŞENLERİ (MOBİL UYUMLU)
+# GÖRÜNÜM BİLEŞENLERİ (CSS İLE ZORLANMIŞ)
 # ==============================================================================
 def silme_butonu_koy(key_prefix, urun_adi):
     sil_key = f"del_{key_prefix}_{urun_adi}"
@@ -254,8 +275,8 @@ def liste_goster(liste_tipi):
         if alinacaklar.empty: st.success("Temiz!")
         
         for index, row in alinacaklar.iterrows():
-            # MOBİL AYARI: Oranları yüzde yaptık ve dikey ortaladık
-            c1, c2 = st.columns([0.80, 0.20], vertical_alignment="center")
+            # CSS SAYESİNDE ARTIK YAN YANA ZORLANACAK
+            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
             with c1:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
                     hizli_durum_degistir(row['Urun'], "1")
@@ -268,8 +289,7 @@ def liste_goster(liste_tipi):
         baslik = "📦 Geçmiş" if liste_tipi == "MARKET" else "✅ Biten İşler"
         with st.expander(f"{baslik} ({len(tamamlananlar)})"):
             for index, row in tamamlananlar.iterrows():
-                # Geçmiş listesi için de mobil ayar
-                c_a, c_b = st.columns([0.80, 0.20], vertical_alignment="center")
+                c_a, c_b = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
                 with c_a:
                     if st.button(f"➕ {row['Urun']}", key=f"back_{liste_tipi}_{index}", use_container_width=True):
                         hizli_durum_degistir(row['Urun'], "0")
@@ -298,8 +318,7 @@ def fatura_listesi_goster():
             icon = "🔁" if tekrar == "HER_AY" else "1️⃣"
             
             with st.container():
-                # MOBİL AYARI: 3 sütun için hassas oranlar
-                c1, c2, c3 = st.columns([0.45, 0.35, 0.20], vertical_alignment="center")
+                c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="center")
                 with c1:
                     st.write(f"**{row['Urun']}**")
                     st.caption(f"🕒 {saat} | {icon}")
@@ -356,8 +375,7 @@ def butce_goster():
             st.divider()
             
             for index, row in df_grup.iterrows():
-                # MOBİL AYARI
-                c_a, c_b, c_c = st.columns([0.45, 0.35, 0.20], vertical_alignment="center")
+                c_a, c_b, c_c = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="center")
                 with c_a:
                     renk = "🟢" if row["Durum"] == "Gelir" else "🔴"
                     st.write(f"{renk} **{row['Urun']}**")
@@ -378,8 +396,7 @@ def yatirim_goster():
 
     for index, row in df_yat.iterrows():
         with st.container():
-            # MOBİL AYARI
-            c1, c2 = st.columns([0.70, 0.30], vertical_alignment="center")
+            c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="center")
             with c1:
                 st.subheader(f"💎 {row['Urun']}")
                 st.caption(f"{row['Zaman']} | 📅 {row['Durum']}")
@@ -403,8 +420,7 @@ def alarm_listesi_goster():
             kalan_sure = hedef_zaman - simdi
             toplam_saniye = kalan_sure.total_seconds()
             
-            # MOBİL AYARI
-            c1, c2, c3 = st.columns([0.45, 0.35, 0.20], vertical_alignment="center")
+            c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="center")
             with c1:
                 st.write(f"**{row['Mesaj']}**")
                 st.caption(f"{hedef_zaman.strftime('%H:%M')}")
@@ -431,7 +447,7 @@ if st.button("🔄 Verileri Yenile", use_container_width=True):
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🛒 MARKET", "📝 İŞLER", "💸 ÖDEME", "💰 BÜTÇE", "📈 YATIRIM", "⏰ ALARM"])
 
 with tab1:
-    c1, c2 = st.columns([0.75, 0.25], vertical_alignment="bottom")
+    c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
     with c1:
         st.text_input("Market (Çoklu: Elma, Armut)", placeholder="Ürün...", label_visibility="collapsed", key="market_giris")
     with c2:
@@ -440,7 +456,7 @@ with tab1:
     liste_goster("MARKET")
 
 with tab2:
-    c1, c2 = st.columns([0.75, 0.25], vertical_alignment="bottom")
+    c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
     with c1:
         st.text_input("Görev (Çoklu: Fatura, Araba)", placeholder="İş...", label_visibility="collapsed", key="is_giris")
     with c2:
