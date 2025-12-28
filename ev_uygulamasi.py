@@ -19,13 +19,12 @@ except ImportError:
     GRAFIK_VAR = False
 
 # ==============================================================================
-# 🔐 GİZLİ TUYA VE AYARLAR (SENİN ŞİFRELERİN EKLENDİ)
+# 🔐 GİZLİ TUYA VE AYARLAR (SENİN ŞİFRELERİN)
 # ==============================================================================
 TUYA_ACCESS_ID = "d3xnudf48p7knkadqe35"
 TUYA_ACCESS_SECRET = "cf5adc62eccc41a8b18d65a4dcd51821"
 MAMA_KABI_1_ID = "eb3ebfbf640898596ea4yk"
 MAMA_KABI_2_ID = "eba49fe3029896e87drx10"
-TUYA_REGION = "us"  # Amerikan hesabı olduğu için 'us' kalmalı
 
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
@@ -52,13 +51,7 @@ st.markdown("""
     }
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; font-style: italic; }
-    .cat-badge {
-        display: inline-block; padding: 4px 12px; border-radius: 12px;
-        color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
-    }
-    .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
     
-    /* Cihaz Kartları */
     .device-card {
         background-color: #f8f9fa; padding: 15px; border-radius: 10px;
         border: 1px solid #ddd; text-align: center; margin-bottom: 10px;
@@ -81,51 +74,66 @@ def get_kategori_renk(kategori):
     return "#34495e"
 
 # ==============================================================================
-# TUYA BULUT BAĞLANTISI (BEYİN KISMI)
+# TUYA BULUT BAĞLANTISI (AKILLI BÖLGE SEÇİMİ)
 # ==============================================================================
 class TuyaCloud:
-    def __init__(self, access_id, access_secret, region="us"):
+    def __init__(self, access_id, access_secret):
         self.access_id = access_id
         self.access_secret = access_secret
-        self.endpoint = f"https://openapi.tuya{region}.com"
-    
+        # Hem Amerika hem Avrupa'yı deneyecek
+        self.endpoints = ["https://openapi.tuyaus.com", "https://openapi.tuyaeu.com"]
+        self.current_endpoint = self.endpoints[0]
+
+    def _calculate_sign(self, t, method, url, body_str=""):
+        string_to_sign = self.access_id + t
+        sign = hmac.new(self.access_secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+        return sign
+
     def _get_token(self):
         t = str(int(time.time() * 1000))
-        sign_str = self.access_id + t
-        sign = hmac.new(self.access_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+        sign = self._calculate_sign(t, "GET", "/v1.0/token")
         headers = {'client_id': self.access_id, 'sign': sign, 't': t, 'sign_method': 'HMAC-SHA256'}
-        try:
-            response = requests.get(f"{self.endpoint}/v1.0/token?grant_type=1", headers=headers)
-            if response.status_code == 200 and response.json().get('success'):
-                return response.json()['result']['access_token']
-            return None
-        except: return None
+        
+        # Tüm bölgeleri dene
+        for endpoint in self.endpoints:
+            try:
+                response = requests.get(f"{endpoint}/v1.0/token?grant_type=1", headers=headers)
+                res = response.json()
+                if res.get('success'):
+                    self.current_endpoint = endpoint # Çalışan bölgeyi kaydet
+                    return res['result']['access_token'], None
+                else:
+                    error_msg = f"Hata: {res.get('code')} - {res.get('msg')}"
+            except Exception as e:
+                error_msg = str(e)
+        
+        return None, error_msg
 
     def send_command(self, device_id, commands):
-        token = self._get_token()
-        if not token: return False, "Token alınamadı (Şifreleri kontrol et)"
+        token, error = self._get_token()
+        if not token: 
+            return False, f"Token Yok! ({error}). Tuya sitesinden 'IoT Core' servisini açtın mı?"
         
         t = str(int(time.time() * 1000))
         string_to_sign = self.access_id + token + t + f"POST\n\n\n\n/v1.0/devices/{device_id}/commands"
         sign = hmac.new(self.access_secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest().upper()
-        
+
         headers = {
             'client_id': self.access_id, 'access_token': token, 'sign': sign, 't': t,
             'sign_method': 'HMAC-SHA256', 'Content-Type': 'application/json'
         }
         payload = {'commands': commands}
         try:
-            response = requests.post(f"{self.endpoint}/v1.0/devices/{device_id}/commands", headers=headers, data=json.dumps(payload))
+            response = requests.post(f"{self.current_endpoint}/v1.0/devices/{device_id}/commands", headers=headers, data=json.dumps(payload))
             res = response.json()
             if res.get('success'): return True, "Başarılı"
-            else: return False, res.get('msg', 'Hata')
+            else: return False, f"Tuya Hatası: {res.get('code')} - {res.get('msg')}"
         except Exception as e: return False, str(e)
 
 # Tuya Nesnesi
-tuya = TuyaCloud(TUYA_ACCESS_ID, TUYA_ACCESS_SECRET, TUYA_REGION)
+tuya = TuyaCloud(TUYA_ACCESS_ID, TUYA_ACCESS_SECRET)
 
 def mama_ver(device_id, porsiyon=1):
-    # 'manual_feed' Tuya standart komutudur
     komut = [{"code": "manual_feed", "value": porsiyon}]
     basari, mesaj = tuya.send_command(device_id, komut)
     return basari, mesaj
@@ -717,7 +725,7 @@ def sayfa_cihazlar():
                     if basari:
                         st.success("✅ Mama verildi!")
                         cihaz_komut_logla("Mama Kabı 1", "1 Porsiyon Verildi")
-                    else: st.error(f"❌ Hata: {msg}")
+                    else: st.error(f"❌ {msg}")
 
             if st.button("🦴🦴 3 Porsiyon Ver (No.1)", use_container_width=True):
                  with st.spinner("📡 Buluta bağlanılıyor..."):
@@ -725,7 +733,7 @@ def sayfa_cihazlar():
                     if basari: 
                         st.success("✅ 3 Porsiyon verildi!")
                         cihaz_komut_logla("Mama Kabı 1", "3 Porsiyon Verildi")
-                    else: st.error(f"❌ Hata: {msg}")
+                    else: st.error(f"❌ {msg}")
 
     # MAMA KABI 2 (YEDEK)
     with st.expander("🍲 Mama Kabı 2 (Yedek)", expanded=True):
@@ -738,7 +746,7 @@ def sayfa_cihazlar():
                     if basari:
                         st.success("✅ Mama verildi!")
                         cihaz_komut_logla("Mama Kabı 2", "1 Porsiyon Verildi")
-                    else: st.error(f"❌ Hata: {msg}")
+                    else: st.error(f"❌ {msg}")
     
     # ROBOT SÜPÜRGE (Şimdilik Simülasyon, Token olmadığı için)
     st.divider()
