@@ -48,32 +48,22 @@ def arka_planda_sil(urun_adi):
     except: pass
 
 def arka_planda_guncelle_yatirim(urun, miktar, notlar, tip):
-    """Yatırım varsa günceller, yoksa ekler"""
     try:
         client = get_client()
         sheet = client.open(DOSYA_ADI).sheet1
-        
-        # Önce var mı diye bak
         bulundu = False
         tum_veriler = sheet.get_all_values()
         
         for i, row in enumerate(tum_veriler):
-            # İsim ve Tip eşleşiyorsa güncelle
             if row[0] == urun and row[4] == tip:
-                # 2: Durum(Tarih), 3: Mesaj(Miktar), 4: Zaman(Not)
-                # Sütun indeksleri (0 tabanlı): 0=Urun, 1=Durum, 2=Mesaj, 3=Zaman, 4=Tip 
-                # Kod yapımız: Urun, Durum, Mesaj, Zaman, Tip
-                # Yatırım İçin: Urun=Ad, Durum=Tarih, Mesaj=Miktar, Zaman=Not, Tip=YATIRIM
-                
-                sheet.update_cell(i + 1, 2, datetime.now().strftime("%Y-%m-%d")) # Tarih
-                sheet.update_cell(i + 1, 3, str(miktar)) # Miktar
-                sheet.update_cell(i + 1, 4, str(notlar)) # Not
+                sheet.update_cell(i + 1, 2, datetime.now().strftime("%Y-%m-%d")) 
+                sheet.update_cell(i + 1, 3, str(miktar))
+                sheet.update_cell(i + 1, 4, str(notlar))
                 bulundu = True
                 break
         
         if not bulundu:
             sheet.append_row([urun, datetime.now().strftime("%Y-%m-%d"), str(miktar), notlar, tip])
-            
     except: pass
 
 def arka_planda_guncelle(urun_adi, yeni_durum):
@@ -142,7 +132,6 @@ def odeme_kontrolu_yap():
                 if odeme_gunu == bugun_gun:
                     bildirim_gonder(f"💸 ÖDEME GÜNÜ: {row['Urun']} ödemesini unutma!")
             except: pass
-        
         st.session_state.odeme_kontrol_yapildi = True
 
 odeme_kontrolu_yap()
@@ -151,30 +140,22 @@ odeme_kontrolu_yap()
 # HIZLI İŞLEM FONKSİYONLARI
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
-    # RAM Ekleme
     yeni_satir = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
     t = threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],))
     t.start()
 
 def hizli_yatirim_guncelle(isim, miktar, notlar):
-    # Yatırım mantığı: Varsa güncelle, yoksa ekle
     df = st.session_state.local_df
-    
-    # Önce RAM'de var mı bak
     mask = (df["Tip"] == "YATIRIM") & (df["Urun"] == isim)
     
     if df[mask].empty:
-        # Yoksa yeni ekle
         hizli_ekle(isim, "YATIRIM", zaman=notlar, mesaj=str(miktar), durum=datetime.now().strftime("%Y-%m-%d"))
     else:
-        # Varsa RAM'de güncelle
         idx = df[mask].index[0]
-        st.session_state.local_df.at[idx, "Mesaj"] = str(miktar) # Miktar
-        st.session_state.local_df.at[idx, "Zaman"] = str(notlar) # Not
-        st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d") # Tarih
-        
-        # Arkada güncelle
+        st.session_state.local_df.at[idx, "Mesaj"] = str(miktar)
+        st.session_state.local_df.at[idx, "Zaman"] = str(notlar)
+        st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d")
         t = threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM"))
         t.start()
 
@@ -219,7 +200,6 @@ def butce_callback():
     tutar = st.session_state.butce_tutar
     tur = st.session_state.butce_tur
     if ad and tutar > 0:
-        # Bütçede Zaman'a TARİH kaydedelim ki aylık gruplayabilelim
         bugun = datetime.now().strftime("%Y-%m-%d")
         hizli_ekle(isim=ad, tip="BUTCE", mesaj=str(tutar), durum=tur, zaman=bugun)
         st.session_state.butce_ad = ""
@@ -339,25 +319,28 @@ def butce_goster():
         st.info("Henüz bütçe verisi girilmedi.")
         return
 
-    # Tarihi datetime objesine çevir (Gruplama için)
+    # HATA DÜZELTME BURADA: Tarihi olmayanları bugünün tarihi yapıyoruz
     df_butce["TarihObj"] = pd.to_datetime(df_butce["Zaman"], errors='coerce')
-    # Ay ismini al (Yıl-Ay olarak sıralama için)
+    # NaT olanları (Eski veri) bugünün tarihiyle doldur
+    df_butce["TarihObj"] = df_butce["TarihObj"].fillna(datetime.now())
+    
+    # Şimdi formata çevir
     df_butce["Ay_Yil"] = df_butce["TarihObj"].dt.strftime('%Y-%m') 
     
-    # Türkçe Ay İsimleri İçin Harita
     aylar = {
         "01": "Ocak", "02": "Şubat", "03": "Mart", "04": "Nisan", "05": "Mayıs", "06": "Haziran",
         "07": "Temmuz", "08": "Ağustos", "09": "Eylül", "10": "Ekim", "11": "Kasım", "12": "Aralık"
     }
 
-    # Grupları tersten sırala (En yeni ay en üstte)
     gruplar = sorted(df_butce["Ay_Yil"].unique(), reverse=True)
 
     for grup in gruplar:
-        yil, ay_no = grup.split("-")
-        baslik = f"{aylar.get(ay_no, 'Ay')} {yil}"
-        
-        # Bu ay mı?
+        try:
+            yil, ay_no = grup.split("-")
+            baslik = f"{aylar.get(ay_no, 'Ay')} {yil}"
+        except:
+            baslik = "Diğer Tarihler"
+
         bu_ay_str = datetime.now().strftime("%Y-%m")
         expanded_durum = (grup == bu_ay_str)
         
@@ -367,7 +350,6 @@ def butce_goster():
         with st.expander(baslik, expanded=expanded_durum):
             df_grup = df_butce[df_butce["Ay_Yil"] == grup]
             
-            # Hesaplama
             gelir = 0
             gider = 0
             for _, row in df_grup.iterrows():
@@ -402,7 +384,6 @@ def yatirim_goster():
         st.info("Yatırım eklenmedi.")
         return
 
-    # Toplam Hesapla
     toplam_tl = 0
     for _, row in df_yat.iterrows():
         try:
@@ -417,10 +398,10 @@ def yatirim_goster():
             c1, c2 = st.columns([3, 1])
             with c1:
                 st.subheader(f"💎 {row['Urun']}")
-                st.caption(f"📝 {row['Zaman']}") # Notlar Zaman sütununda
-                st.caption(f"📅 Son Güncelleme: {row['Durum']}")
+                st.caption(f"📝 {row['Zaman']}") 
+                st.caption(f"📅 {row['Durum']}")
             with c2:
-                st.success(f"{row['Mesaj']} ₺") # Miktar Mesaj sütununda
+                st.success(f"{row['Mesaj']} ₺") 
                 silme_butonu_koy(f"yat_{index}", row['Urun'])
         st.divider()
 
@@ -511,14 +492,14 @@ with tab4:
     butce_goster()
 
 with tab5:
-    st.info("İpucu: Mevcut bir varlığın adını tekrar yazıp eklersen, miktar ve not güncellenir (Silmene gerek yok).")
+    st.info("İpucu: Mevcut bir varlığın adını tekrar yazıp eklersen, miktar ve not güncellenir.")
     with st.expander("➕ Varlık Ekle / Güncelle", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
             st.text_input("Varlık Adı", placeholder="Altın, Dolar...", key="yat_ad")
             st.number_input("Değeri (TL)", min_value=0.0, step=100.0, key="yat_mik")
         with c2:
-            st.text_area("Notlar", placeholder="Banka kasasında, Binance hesabında...", height=100, key="yat_not")
+            st.text_area("Notlar", placeholder="Banka kasasında...", height=100, key="yat_not")
             st.button("KAYDET / GÜNCELLE", key="btn_y", on_click=yatirim_callback, use_container_width=True)
     st.markdown("---")
     yatirim_goster()
