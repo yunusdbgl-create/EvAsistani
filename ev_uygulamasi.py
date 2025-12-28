@@ -23,7 +23,6 @@ st.markdown("""
     div[data-testid="column"] { display: flex; align-items: center; height: 100%; }
     button { padding: 0.25rem 0.5rem !important; }
     
-    /* Karşılama Kutusu */
     .welcome-box {
         background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
         color: #2c3e50; padding: 15px; border-radius: 15px;
@@ -31,14 +30,10 @@ st.markdown("""
     }
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; font-style: italic; }
-
-    /* Kategori Rozetleri */
     .cat-badge {
         display: inline-block; padding: 4px 12px; border-radius: 12px;
         color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
     }
-    
-    /* Expander Başlıkları */
     .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
 </style>
 """, unsafe_allow_html=True)
@@ -46,13 +41,12 @@ st.markdown("""
 # KATEGORİ RENK HARİTASI
 def get_kategori_renk(kategori):
     renkler = {
-        "Meyve": "#2ecc71", "Sebze": "#2ecc71", "Manav": "#2ecc71", # Yeşil
-        "Et": "#e74c3c", "Şarküteri": "#e74c3c", # Kırmızı
-        "Süt": "#3498db", "Kahvaltılık": "#f1c40f", # Mavi / Sarı
-        "Temizlik": "#9b59b6", "Ev": "#9b59b6", # Mor
-        "Gıda": "#e67e22", "Bakliyat": "#d35400", # Turuncu
-        "Atıştırmalık": "#e84393", # Pembe
-        "Genel": "#95a5a6" # Gri
+        "Meyve": "#2ecc71", "Sebze": "#2ecc71", "Manav": "#2ecc71",
+        "Et": "#e74c3c", "Şarküteri": "#e74c3c",
+        "Süt": "#3498db", "Kahvaltılık": "#f1c40f",
+        "Temizlik": "#9b59b6", "Ev": "#9b59b6",
+        "Gıda": "#e67e22", "Bakliyat": "#d35400",
+        "Atıştırmalık": "#e84393", "Genel": "#95a5a6"
     }
     for key, color in renkler.items():
         if key in kategori: return color
@@ -97,9 +91,9 @@ def karsilama_paneli():
     saat = datetime.now().hour
     selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
     sozler = [
-        "🏡 Evimiz kalemizdir.", "💡 Kategorileri tıklayarak açıp kapatabilirsin.",
-        "🐈 Prenses'e selamlar!", "❤️ Geçmiş listesi artık çok daha derli toplu.",
-        "🛒 Alınacaklar listesi seni bekliyor.", "👨‍🍳 Şef bugün ne pişirsek diyor?"
+        "🏡 Evimiz kalemizdir.", "💡 Kahvaltıda ne yesek? Çarkı çevir!",
+        "🐈 Prenses'e selamlar!", "❤️ Bugün güzel bir gün olsun.",
+        "🛒 Eksikleri anında yaz ki unutulmasın.", "👨‍🍳 Şef de emrinizde, Çark da!"
     ]
     st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
 
@@ -189,6 +183,24 @@ def hizli_yatirim_guncelle(isim, miktar, notlar):
         st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d")
         threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM")).start()
 
+def varsayilan_yemekleri_yukle():
+    KAHVALTI = ["Menemen", "Omlet", "Sucuklu Yumurta", "Pankek", "Kuymak", "Simit & Peynir", "Haşlanmış Yumurta", "Kahvaltı Tabağı", "Patates Kızartması", "Tost"]
+    YEMEK = ["Karnıyarık", "Kuru Fasulye & Pilav", "Mantı", "Köfte & Patates", "Tavuk Sote", "Balık & Salata", "Bezelye", "Ispanak", "Makarna", "Lahmacun", "Hamburger", "Pizza", "Mercimek Çorbası", "Türlü", "Dolma"]
+    
+    sayac = 0
+    for y in KAHVALTI:
+        hizli_ekle(y, "YEMEK_KAHVALTI", durum="1") # 1 = Çarkta aktif
+        sayac += 1
+        time.sleep(0.05)
+    for y in YEMEK:
+        hizli_ekle(y, "YEMEK_OGUN", durum="1")
+        sayac += 1
+        time.sleep(0.05)
+        
+    st.toast(f"✅ {sayac} çeşit yemek çarka eklendi!")
+    time.sleep(1)
+    st.rerun()
+
 # CALLBACKLER
 def market_ekleme_callback():
     val = st.session_state.market_giris
@@ -209,6 +221,12 @@ def is_ekleme_callback():
         hizli_ekle(val, "TODO", mesaj=kategori)
         st.session_state.is_giris = ""
         if "is_kategori_yeni" in st.session_state: st.session_state.is_kategori_yeni = ""
+
+def yemek_ekle_callback(input_key, tip_kod):
+    val = st.session_state[input_key]
+    if val:
+        hizli_ekle(val, tip_kod, durum="1") # Yeni eklenen varsayılan olarak tikli gelir
+        st.session_state[input_key] = ""
 
 def ekleme_callback(key, tip):
     val = st.session_state[key]
@@ -277,9 +295,8 @@ def sayfa_ana_ekran():
 
         st.markdown("---")
         
-        # AKTİF LİSTE (ALINACAKLAR)
+        # AKTİF LİSTE
         alinacaklar = df_market[df_market["Durum"] == "0"]
-        
         st.subheader("📌 Alınacaklar Listesi")
         if alinacaklar.empty: st.success("Sepet Boş! 🎉")
         
@@ -291,11 +308,8 @@ def sayfa_ana_ekran():
             else: items = alinacaklar[alinacaklar["Mesaj"] == kat]
             
             if not items.empty:
-                # RENKLİ EXPANDER
                 renk = get_kategori_renk(kat)
-                # Expander kullanarak açılır/kapanır yaptık. Varsayılan olarak AÇIK.
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    # İçine de renkli bir çizgi koyalım ki kategoriler belli olsun
                     st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
                     for i, row in items.iterrows():
                         c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
@@ -305,7 +319,7 @@ def sayfa_ana_ekran():
 
         st.divider()
         
-        # GEÇMİŞ (İÇ İÇE EXPANDER)
+        # GEÇMİŞ
         tamamlananlar = df_market[df_market["Durum"] == "1"]
         with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
             if tamamlananlar.empty: st.info("Geçmiş boş.")
@@ -433,8 +447,64 @@ def sayfa_ekonomi():
                 with c2: silme_butonu_koy(f"y_{i}", row['Urun'])
 
 def sayfa_yasam():
-    tab1, tab2, tab3 = st.tabs(["👨‍🍳 ŞEF", "⏳ SAYAÇ", "📒 NOTLAR"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎡 KAHVALTI ÇARKI", "🎡 YEMEK ÇARKI", "👨‍🍳 AI ŞEF", "⏳ SAYAÇ", "📒 NOTLAR"])
+    
+    if st.button("📥 Varsayılan Yemekleri Yükle (İlk Kurulum)", key="btn_yemek_yukle", use_container_width=True):
+        varsayilan_yemekleri_yukle()
+
+    # KAHVALTI ÇARKI
     with tab1:
+        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
+        with c1: st.text_input("Kahvaltı Ekle", key="kahvalti_giris", label_visibility="collapsed")
+        with c2: st.button("EKLE", key="btn_kahvalti", on_click=yemek_ekle_callback, args=("kahvalti_giris", "YEMEK_KAHVALTI"), use_container_width=True)
+        st.markdown("---")
+        df_k = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_KAHVALTI"]
+        
+        # Sadece tikli olanları havuza al
+        havuz = df_k[df_k["Durum"] == "1"]["Urun"].tolist()
+        if havuz:
+            if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_kahvalti", type="primary", use_container_width=True):
+                st.balloons(); st.success(f"🍳 Kahvaltı: **{random.choice(havuz)}**")
+        else: st.warning("Listeden seçim yapın.")
+        
+        st.divider()
+        for i, row in df_k.iterrows():
+            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+            with c1:
+                chk = (row['Durum'] == "1")
+                if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"k_chk_{i}"):
+                    if not chk: hizli_durum_degistir(row['Urun'], "1")
+                else:
+                    if chk: hizli_durum_degistir(row['Urun'], "0")
+            with c2: silme_butonu_koy(f"k_del_{i}", row['Urun'])
+
+    # YEMEK ÇARKI
+    with tab2:
+        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
+        with c1: st.text_input("Yemek Ekle", key="yemek_giris", label_visibility="collapsed")
+        with c2: st.button("EKLE", key="btn_yemek", on_click=yemek_ekle_callback, args=("yemek_giris", "YEMEK_OGUN"), use_container_width=True)
+        st.markdown("---")
+        df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_OGUN"]
+        
+        havuz = df_y[df_y["Durum"] == "1"]["Urun"].tolist()
+        if havuz:
+            if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_yemek", type="primary", use_container_width=True):
+                st.balloons(); st.success(f"🥘 Akşam Yemeği: **{random.choice(havuz)}**")
+        else: st.warning("Listeden seçim yapın.")
+        
+        st.divider()
+        for i, row in df_y.iterrows():
+            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+            with c1:
+                chk = (row['Durum'] == "1")
+                if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"y_chk_{i}"):
+                    if not chk: hizli_durum_degistir(row['Urun'], "1")
+                else:
+                    if chk: hizli_durum_degistir(row['Urun'], "0")
+            with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
+
+    # AI ŞEF
+    with tab3:
         st.subheader("👨‍🍳 AI Mutfak Şefi")
         st.info("Market geçmişine bakar, ek malzemelerle tarif önerir.")
         df = st.session_state.local_df
@@ -450,7 +520,7 @@ def sayfa_yasam():
                 for yemek, eksikler in eksik: st.write(f"• **{yemek}** için eksik: *{', '.join(eksikler)}*")
             if not tam and not eksik: st.error("Bu malzemelerle bir tarif bulamadım.")
 
-    with tab2:
+    with tab4:
         with st.expander("➕ Yeni Sayaç", expanded=True):
             st.text_input("Etkinlik", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih")
             st.button("KAYDET", key="btn_syc_save", on_click=sayac_callback)
@@ -466,7 +536,7 @@ def sayfa_yasam():
                     st.divider()
                 except: pass
 
-    with tab3:
+    with tab5:
         with st.expander("➕ Not Ekle", expanded=True):
             st.text_input("Başlık", key="not_baslik"); st.text_area("İçerik", key="not_icerik"); st.button("KAYDET", key="btn_not_save", on_click=not_callback)
         df_n = st.session_state.local_df[st.session_state.local_df["Tip"] == "NOTE"]
