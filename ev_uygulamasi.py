@@ -53,7 +53,6 @@ def arka_planda_guncelle_yatirim(urun, miktar, notlar, tip):
         sheet = client.open(DOSYA_ADI).sheet1
         bulundu = False
         tum_veriler = sheet.get_all_values()
-        
         for i, row in enumerate(tum_veriler):
             if row[0] == urun and row[4] == tip:
                 sheet.update_cell(i + 1, 2, datetime.now().strftime("%Y-%m-%d")) 
@@ -61,7 +60,6 @@ def arka_planda_guncelle_yatirim(urun, miktar, notlar, tip):
                 sheet.update_cell(i + 1, 4, str(notlar))
                 bulundu = True
                 break
-        
         if not bulundu:
             sheet.append_row([urun, datetime.now().strftime("%Y-%m-%d"), str(miktar), notlar, tip])
     except: pass
@@ -222,7 +220,7 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM BİLEŞENLERİ
+# GÖRÜNÜM BİLEŞENLERİ (MOBİL UYUMLU)
 # ==============================================================================
 def silme_butonu_koy(key_prefix, urun_adi):
     sil_key = f"del_{key_prefix}_{urun_adi}"
@@ -256,7 +254,8 @@ def liste_goster(liste_tipi):
         if alinacaklar.empty: st.success("Temiz!")
         
         for index, row in alinacaklar.iterrows():
-            c1, c2 = st.columns([5, 1])
+            # MOBİL AYARI: Oranları yüzde yaptık ve dikey ortaladık
+            c1, c2 = st.columns([0.80, 0.20], vertical_alignment="center")
             with c1:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
                     hizli_durum_degistir(row['Urun'], "1")
@@ -269,7 +268,8 @@ def liste_goster(liste_tipi):
         baslik = "📦 Geçmiş" if liste_tipi == "MARKET" else "✅ Biten İşler"
         with st.expander(f"{baslik} ({len(tamamlananlar)})"):
             for index, row in tamamlananlar.iterrows():
-                c_a, c_b = st.columns([4, 1])
+                # Geçmiş listesi için de mobil ayar
+                c_a, c_b = st.columns([0.80, 0.20], vertical_alignment="center")
                 with c_a:
                     if st.button(f"➕ {row['Urun']}", key=f"back_{liste_tipi}_{index}", use_container_width=True):
                         hizli_durum_degistir(row['Urun'], "0")
@@ -298,14 +298,15 @@ def fatura_listesi_goster():
             icon = "🔁" if tekrar == "HER_AY" else "1️⃣"
             
             with st.container():
-                c1, c2, c3 = st.columns([3, 2, 1])
+                # MOBİL AYARI: 3 sütun için hassas oranlar
+                c1, c2, c3 = st.columns([0.45, 0.35, 0.20], vertical_alignment="center")
                 with c1:
                     st.write(f"**{row['Urun']}**")
                     st.caption(f"🕒 {saat} | {icon}")
                 with c2:
-                    if kalan == 0: st.error("❗ BUGÜN!")
+                    if kalan == 0: st.error("❗ BUGÜN")
                     elif kalan > 0: st.success(f"⏳ {kalan} gün")
-                    else: st.warning("Günü geçti")
+                    else: st.warning("Geçti")
                 with c3:
                     silme_butonu_koy(f"fat_{index}", row['Urun'])
             st.divider()
@@ -319,12 +320,8 @@ def butce_goster():
         st.info("Henüz bütçe verisi girilmedi.")
         return
 
-    # HATA DÜZELTME BURADA: Tarihi olmayanları bugünün tarihi yapıyoruz
     df_butce["TarihObj"] = pd.to_datetime(df_butce["Zaman"], errors='coerce')
-    # NaT olanları (Eski veri) bugünün tarihiyle doldur
     df_butce["TarihObj"] = df_butce["TarihObj"].fillna(datetime.now())
-    
-    # Şimdi formata çevir
     df_butce["Ay_Yil"] = df_butce["TarihObj"].dt.strftime('%Y-%m') 
     
     aylar = {
@@ -338,8 +335,7 @@ def butce_goster():
         try:
             yil, ay_no = grup.split("-")
             baslik = f"{aylar.get(ay_no, 'Ay')} {yil}"
-        except:
-            baslik = "Diğer Tarihler"
+        except: baslik = "Diğer"
 
         bu_ay_str = datetime.now().strftime("%Y-%m")
         expanded_durum = (grup == bu_ay_str)
@@ -349,25 +345,19 @@ def butce_goster():
         
         with st.expander(baslik, expanded=expanded_durum):
             df_grup = df_butce[df_butce["Ay_Yil"] == grup]
-            
-            gelir = 0
-            gider = 0
-            for _, row in df_grup.iterrows():
-                try:
-                    tutar = float(row["Mesaj"])
-                    if row["Durum"] == "Gelir": gelir += tutar
-                    else: gider += tutar
-                except: pass
+            gelir = sum(float(row["Mesaj"]) for _, row in df_grup.iterrows() if row["Durum"] == "Gelir")
+            gider = sum(float(row["Mesaj"]) for _, row in df_grup.iterrows() if row["Durum"] == "Gider")
             
             c1, c2, c3 = st.columns(3)
-            c1.metric("Gelir", f"{gelir} ₺")
-            c2.metric("Gider", f"{gider} ₺")
-            c3.metric("Kalan", f"{gelir - gider} ₺", delta=(gelir-gider))
+            c1.metric("Gelir", f"{gelir:.0f}₺")
+            c2.metric("Gider", f"{gider:.0f}₺")
+            c3.metric("Kalan", f"{gelir-gider:.0f}₺", delta=(gelir-gider))
             
             st.divider()
             
             for index, row in df_grup.iterrows():
-                c_a, c_b, c_c = st.columns([3, 2, 1])
+                # MOBİL AYARI
+                c_a, c_b, c_c = st.columns([0.45, 0.35, 0.20], vertical_alignment="center")
                 with c_a:
                     renk = "🟢" if row["Durum"] == "Gelir" else "🔴"
                     st.write(f"{renk} **{row['Urun']}**")
@@ -379,27 +369,20 @@ def butce_goster():
 def yatirim_goster():
     df = st.session_state.local_df
     df_yat = df[df["Tip"] == "YATIRIM"]
-    
-    if df_yat.empty:
-        st.info("Yatırım eklenmedi.")
-        return
+    if df_yat.empty: return
 
-    toplam_tl = 0
-    for _, row in df_yat.iterrows():
-        try:
-            toplam_tl += float(row["Mesaj"])
-        except: pass
+    toplam_tl = sum(float(row["Mesaj"]) for _, row in df_yat.iterrows() if row["Mesaj"].replace('.','',1).isdigit())
         
     st.metric("💰 TOPLAM VARLIK", f"{toplam_tl:,.0f} ₺")
     st.markdown("---")
 
     for index, row in df_yat.iterrows():
         with st.container():
-            c1, c2 = st.columns([3, 1])
+            # MOBİL AYARI
+            c1, c2 = st.columns([0.70, 0.30], vertical_alignment="center")
             with c1:
                 st.subheader(f"💎 {row['Urun']}")
-                st.caption(f"📝 {row['Zaman']}") 
-                st.caption(f"📅 {row['Durum']}")
+                st.caption(f"{row['Zaman']} | 📅 {row['Durum']}")
             with c2:
                 st.success(f"{row['Mesaj']} ₺") 
                 silme_butonu_koy(f"yat_{index}", row['Urun'])
@@ -420,10 +403,11 @@ def alarm_listesi_goster():
             kalan_sure = hedef_zaman - simdi
             toplam_saniye = kalan_sure.total_seconds()
             
-            c1, c2, c3 = st.columns([3, 2, 1])
+            # MOBİL AYARI
+            c1, c2, c3 = st.columns([0.45, 0.35, 0.20], vertical_alignment="center")
             with c1:
                 st.write(f"**{row['Mesaj']}**")
-                st.caption(f"Hedef: {hedef_zaman.strftime('%H:%M')}")
+                st.caption(f"{hedef_zaman.strftime('%H:%M')}")
             with c2:
                 if toplam_saniye > 0:
                     dakika = int(toplam_saniye / 60)
@@ -447,7 +431,7 @@ if st.button("🔄 Verileri Yenile", use_container_width=True):
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🛒 MARKET", "📝 İŞLER", "💸 ÖDEME", "💰 BÜTÇE", "📈 YATIRIM", "⏰ ALARM"])
 
 with tab1:
-    c1, c2 = st.columns([3, 1])
+    c1, c2 = st.columns([0.75, 0.25], vertical_alignment="bottom")
     with c1:
         st.text_input("Market (Çoklu: Elma, Armut)", placeholder="Ürün...", label_visibility="collapsed", key="market_giris")
     with c2:
@@ -456,7 +440,7 @@ with tab1:
     liste_goster("MARKET")
 
 with tab2:
-    c1, c2 = st.columns([3, 1])
+    c1, c2 = st.columns([0.75, 0.25], vertical_alignment="bottom")
     with c1:
         st.text_input("Görev (Çoklu: Fatura, Araba)", placeholder="İş...", label_visibility="collapsed", key="is_giris")
     with c2:
@@ -492,7 +476,7 @@ with tab4:
     butce_goster()
 
 with tab5:
-    st.info("İpucu: Mevcut bir varlığın adını tekrar yazıp eklersen, miktar ve not güncellenir.")
+    st.info("Mevcut varlık adını yazıp eklersen güncellenir.")
     with st.expander("➕ Varlık Ekle / Güncelle", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
