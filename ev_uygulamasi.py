@@ -29,7 +29,6 @@ st.markdown("""
     }
     .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 15px; opacity: 0.95; }
-    /* Expander başlıklarını biraz daha belirgin yapalım */
     .streamlit-expanderHeader { font-weight: bold; color: #333; }
 </style>
 """, unsafe_allow_html=True)
@@ -73,7 +72,7 @@ def karsilama_paneli():
     saat = datetime.now().hour
     selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
     sozler = [
-        "🏡 Evimiz, huzurumuzdur.", "💡 Eklediğin kategoriler hafızamda, merak etme.",
+        "🏡 Evimiz, huzurumuzdur.", "💡 Eklediğin kategoriler hafızamda.",
         "🐈 Prenses bugün nasıl?", "❤️ Listeler artık çok daha düzenli.",
         "🛒 Geçmiş alışverişlerin de artık gruplu!", "👨‍🍳 Şef, dolaptakileri biliyor!"
     ]
@@ -173,7 +172,7 @@ def hizli_yatirim_guncelle(isim, miktar, notlar):
         st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d")
         threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM")).start()
 
-# CALLBACKLER
+# CALLBACKLER (HATA DÜZELTİLDİ)
 def ekleme_callback(key, tip):
     val = st.session_state[key]
     if val:
@@ -183,7 +182,9 @@ def ekleme_callback(key, tip):
 def market_ekleme_callback():
     val = st.session_state.market_giris
     kat_secim = st.session_state.market_kategori_secim
-    kat_yeni = st.session_state.market_kategori_yeni
+    
+    # HATA DÜZELTME: .get() ile güvenli erişim
+    kat_yeni = st.session_state.get("market_kategori_yeni", "")
     
     if kat_secim == "✏️ Yeni Kategori Yaz" and kat_yeni:
         kategori = kat_yeni
@@ -193,12 +194,16 @@ def market_ekleme_callback():
     if val:
         hizli_ekle(val, "MARKET", mesaj=kategori)
         st.session_state.market_giris = ""
-        st.session_state.market_kategori_yeni = ""
+        # Input varsa temizle
+        if "market_kategori_yeni" in st.session_state:
+            st.session_state.market_kategori_yeni = ""
 
 def is_ekleme_callback():
     val = st.session_state.is_giris
     kat_secim = st.session_state.is_kategori_secim
-    kat_yeni = st.session_state.is_kategori_yeni
+    
+    # HATA DÜZELTME: .get() ile güvenli erişim
+    kat_yeni = st.session_state.get("is_kategori_yeni", "")
     
     if kat_secim == "✏️ Yeni Kategori Yaz" and kat_yeni:
         kategori = kat_yeni
@@ -208,7 +213,9 @@ def is_ekleme_callback():
     if val:
         hizli_ekle(val, "TODO", mesaj=kategori)
         st.session_state.is_giris = ""
-        st.session_state.is_kategori_yeni = ""
+        # Input varsa temizle
+        if "is_kategori_yeni" in st.session_state:
+            st.session_state.is_kategori_yeni = ""
 
 def not_callback():
     baslik, icerik = st.session_state.not_baslik, st.session_state.not_icerik
@@ -262,7 +269,6 @@ def sayfa_ana_ekran():
     
     # --- MARKET ---
     with tab1:
-        # ÖĞRENEN KATEGORİ SİSTEMİ
         df = st.session_state.local_df
         df_market = df[df["Tip"] == "MARKET"]
         
@@ -271,10 +277,9 @@ def sayfa_ana_ekran():
         
         # 2. Veritabanından Öğrenilen Kategoriler
         kayitli_kategoriler = set(df_market["Mesaj"].dropna().unique())
-        # Boşlukları ve gereksizleri temizle
         kayitli_kategoriler = {k for k in kayitli_kategoriler if k and k != "Genel" and k != "None" and k != "✏️ Yeni Kategori Yaz"}
         
-        # 3. Hepsini Birleştir ve Sırala
+        # 3. Hepsini Birleştir
         TUM_KATEGORILER = sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler))
         TUM_KATEGORILER.append("✏️ Yeni Kategori Yaz")
         
@@ -291,22 +296,19 @@ def sayfa_ana_ekran():
         alinacaklar = df_market[df_market["Durum"] == "0"]
         if alinacaklar.empty: st.success("Sepet Boş! 🎉")
         
-        # GÖSTERİM (AÇILIR KAPANIR - EXPANDER)
-        # Kategorileri listele (Genel en sona gelsin)
+        # GRUPLU LİSTELEME
         kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
         if "Genel" in kategori_listesi: 
-            kategori_listesi.remove("Genel")
-            kategori_listesi.append("Genel")
+            kategori_listesi.remove("Genel"); kategori_listesi.append("Genel")
 
         for kat in kategori_listesi:
-            # Filtreleme
             if kat == "Genel":
                 items = alinacaklar[(alinacaklar["Mesaj"] == "") | (alinacaklar["Mesaj"] == "Genel") | (alinacaklar["Mesaj"] == "None")]
             else:
                 items = alinacaklar[alinacaklar["Mesaj"] == kat]
             
             if not items.empty:
-                # EXPANDER KULLANIMI: Açılır kapanır kutu
+                # EXPANDER İLE SIKIŞTIRILMIŞ GÖRÜNÜM
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
                     for i, row in items.iterrows():
                         c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
@@ -316,11 +318,10 @@ def sayfa_ana_ekran():
 
         st.divider()
         
-        # GEÇMİŞ (AYRI EXPANDERLAR HALİNDE)
+        # GEÇMİŞ
         tamamlananlar = df_market[df_market["Durum"] == "1"]
         with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
-            if tamamlananlar.empty:
-                st.info("Geçmiş boş.")
+            if tamamlananlar.empty: st.info("Geçmiş boş.")
             else:
                 for kat in kategori_listesi:
                     if kat == "Genel":
@@ -337,11 +338,9 @@ def sayfa_ana_ekran():
                             with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
                         st.divider()
 
-    # --- İŞLER (KATEGORİLİ & ÖĞRENEN) ---
+    # --- İŞLER ---
     with tab2:
         df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
-        
-        # Varsayılan + Öğrenilen
         VARSAYILAN_IS = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba"]
         kayitli_is = set(df_todo["Mesaj"].dropna().unique())
         kayitli_is = {k for k in kayitli_is if k and k != "Genel" and k != "None" and k != "✏️ Yeni Kategori Yaz"}
@@ -358,7 +357,7 @@ def sayfa_ana_ekran():
 
         st.markdown("---")
         
-        # İşleri Listele (Expander ile)
+        # İşleri Listele
         is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
         if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
 
