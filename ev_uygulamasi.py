@@ -98,7 +98,7 @@ def karsilama_paneli():
     saat = datetime.now().hour
     selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
     sozler = [
-        "🏡 Evimiz kalemizdir.", "💡 Grafikler varlıklarını daha iyi yönetmeni sağlar.",
+        "🏡 Evimiz kalemizdir.", "💡 Yemekler artık kendi menüsünde!",
         "🐈 Prenses'e selamlar!", "❤️ Günlük rutinlerini tamamladın mı?",
         "🛒 Alınacaklar listesi seni bekliyor.", "👨‍🍳 Şef bugün ne pişirsek diyor?"
     ]
@@ -276,14 +276,12 @@ def silme_butonu_koy(prefix, urun):
         st.caption("İptal")
 
 # ==============================================================================
-# DASHBOARD (EVİN NABZI)
+# DASHBOARD (EVİN NABZI) - GİZLİLİK MODU
 # ==============================================================================
 def dashboard_goster():
     df = st.session_state.local_df
     
-    df_y = df[df["Tip"] == "YATIRIM"]
-    toplam_varlik = sum(float(r["Mesaj"]) for _, r in df_y.iterrows() if r["Mesaj"].replace('.','',1).isdigit())
-    
+    # Sıradaki Fatura
     df_f = df[df["Tip"] == "FATURA"]
     siradaki_fatura = "Yok"; kalan_gun_txt = ""
     if not df_f.empty:
@@ -297,12 +295,13 @@ def dashboard_goster():
                 kalan_gun_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
                 break
     
+    # Market Sepeti
     sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("💰 Varlıklar", f"{toplam_varlik:,.0f} ₺")
-    c2.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
-    c3.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
+    # SADECE 2 KUTU (VARLIK GİZLENDİ)
+    c1, c2 = st.columns(2)
+    c1.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
+    c2.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
     st.markdown("---")
 
 # ==============================================================================
@@ -463,7 +462,6 @@ def sayfa_ekonomi():
             with c2: st.text_area("Not", height=100, key="yat_not"); st.button("KAYDET", key="btn_yat_save", on_click=yatirim_callback, use_container_width=True)
         df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]
         
-        # GRAFİK GÖSTERİMİ
         if GRAFIK_VAR and not df_y.empty:
             df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if x.replace('.','',1).isdigit() else 0)
             toplam = df_y["Tutar"].sum()
@@ -485,10 +483,13 @@ def sayfa_ekonomi():
             with c1: st.subheader(f"💎 {row['Urun']}"); st.caption(f"{row['Mesaj']} ₺ | {row['Durum']}")
             with c2: silme_butonu_koy(f"y_{i}", row['Urun'])
 
-def sayfa_yasam():
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🎡 KAHVALTI", "🎡 YEMEK", "⛓️ ZİNCİR", "👨‍🍳 ŞEF", "⏳ SAYAÇ", "📒 NOTLAR"])
+# ==============================================================================
+# YENİ MENÜ: YEMEKLER
+# ==============================================================================
+def sayfa_yemekler():
+    tab1, tab2, tab3 = st.tabs(["🎡 KAHVALTI", "🎡 YEMEK", "👨‍🍳 AI ŞEF"])
     
-    with st.expander("⚙️ Ayarlar / Temizlik"):
+    with st.expander("⚙️ Temizlik"):
         if st.button("🧹 Çift Kayıtları Temizle", use_container_width=True): listeyi_temizle()
 
     with tab1:
@@ -532,6 +533,27 @@ def sayfa_yasam():
             with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
 
     with tab3:
+        st.subheader("👨‍🍳 AI Mutfak Şefi")
+        df = st.session_state.local_df
+        marketten_gelenler = df[(df["Tip"] == "MARKET") & (df["Durum"] == "1")]["Urun"].tolist()
+        malzemeler = ["Yumurta", "Domates", "Biber", "Soğan", "Kıyma", "Patates", "Tavuk", "Makarna", "Salça", "Pirinç", "Mercimek", "Yoğurt", "Salatalık", "Patlıcan", "Mantar"]
+        ek_malzemeler = st.multiselect("Evde başka ne var?", malzemeler)
+        if st.button("🔍 Ne Pişirsem?", type="primary", use_container_width=True):
+            tam, eksik, stok_listesi = mutfak_sefi_motoru(marketten_gelenler, ek_malzemeler)
+            with st.expander("📦 Algılanan Stoklar"): st.write(", ".join(stok_listesi))
+            if tam: st.success(f"✅ **Hemen Yapabilirsin:** {', '.join(tam)}")
+            if eksik:
+                st.markdown("---"); st.warning("🛒 **Ufak Eksikler Var:**")
+                for yemek, eksikler in eksik: st.write(f"• **{yemek}** için eksik: *{', '.join(eksikler)}*")
+            if not tam and not eksik: st.error("Bu malzemelerle bir tarif bulamadım.")
+
+# ==============================================================================
+# SADELEŞEN MENÜ: YAŞAM
+# ==============================================================================
+def sayfa_yasam():
+    tab1, tab2, tab3 = st.tabs(["⛓️ ZİNCİR", "⏳ SAYAÇ", "📒 NOTLAR"])
+
+    with tab1:
         st.caption("Günlük hedeflerini tamamla, zinciri kırma!")
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Rutin Ekle", key="rutin_giris", label_visibility="collapsed", placeholder="Su iç...")
@@ -550,22 +572,7 @@ def sayfa_yasam():
                     if is_done: hizli_durum_degistir(row['Urun'], "0"); st.rerun()
             with c2: silme_butonu_koy(f"r_del_{i}", row['Urun'])
 
-    with tab4:
-        st.subheader("👨‍🍳 AI Mutfak Şefi")
-        df = st.session_state.local_df
-        marketten_gelenler = df[(df["Tip"] == "MARKET") & (df["Durum"] == "1")]["Urun"].tolist()
-        malzemeler = ["Yumurta", "Domates", "Biber", "Soğan", "Kıyma", "Patates", "Tavuk", "Makarna", "Salça", "Pirinç", "Mercimek", "Yoğurt", "Salatalık", "Patlıcan", "Mantar"]
-        ek_malzemeler = st.multiselect("Evde başka ne var?", malzemeler)
-        if st.button("🔍 Ne Pişirsem?", type="primary", use_container_width=True):
-            tam, eksik, stok_listesi = mutfak_sefi_motoru(marketten_gelenler, ek_malzemeler)
-            with st.expander("📦 Algılanan Stoklar"): st.write(", ".join(stok_listesi))
-            if tam: st.success(f"✅ **Hemen Yapabilirsin:** {', '.join(tam)}")
-            if eksik:
-                st.markdown("---"); st.warning("🛒 **Ufak Eksikler Var:**")
-                for yemek, eksikler in eksik: st.write(f"• **{yemek}** için eksik: *{', '.join(eksikler)}*")
-            if not tam and not eksik: st.error("Bu malzemelerle bir tarif bulamadım.")
-
-    with tab5:
+    with tab2:
         with st.expander("➕ Yeni Sayaç", expanded=True):
             st.text_input("Etkinlik", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih")
             st.button("KAYDET", key="btn_syc_save", on_click=sayac_callback)
@@ -581,7 +588,7 @@ def sayfa_yasam():
                     st.divider()
                 except: pass
 
-    with tab6:
+    with tab3:
         with st.expander("➕ Not Ekle", expanded=True):
             st.text_input("Başlık", key="not_baslik"); st.text_area("İçerik", key="not_icerik"); st.button("KAYDET", key="btn_not_save", on_click=not_callback)
         df_n = st.session_state.local_df[st.session_state.local_df["Tip"] == "NOTE"]
@@ -598,16 +605,17 @@ def sayfa_dosya():
 # ÇALIŞTIRMA
 # ==============================================================================
 karsilama_paneli()
-dashboard_goster() # DASHBOARD GÖSTERİMİ
+dashboard_goster()
 
 with st.sidebar:
     st.header("Menü")
-    secim = st.radio("Git:", ["🏠 Ana Sayfa", "💰 Ekonomi", "🧬 Yaşam", "📂 Dosya"])
+    secim = st.radio("Git:", ["🏠 Ana Sayfa", "🍽️ Yemekler", "💰 Ekonomi", "🧬 Yaşam", "📂 Dosya"])
     st.markdown("---"); st.header("Linkler")
     st.markdown('<a href="https://www.turkiye.gov.tr/" target="_blank" class="link-box">🏛️ E-Devlet</a>', unsafe_allow_html=True)
     st.markdown('<a href="https://www.enabiz.gov.tr/" target="_blank" class="link-box">🏥 E-Nabız</a>', unsafe_allow_html=True)
 
 if secim == "🏠 Ana Sayfa": sayfa_ana_ekran()
+elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
