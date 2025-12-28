@@ -147,7 +147,10 @@ def verileri_yukle():
     try:
         data = get_client().open(DOSYA_ADI).sheet1.get_all_values()
         if not data or "Urun" not in data[0]: return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
-        return pd.DataFrame(data[1:], columns=data[0]).astype(str)
+        df = pd.DataFrame(data[1:], columns=data[0]).astype(str)
+        # OTOMATİK TEMİZLİK: Yüklerken çift kayıtları RAM'de temizle
+        df = df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
+        return df
     except: return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
 
 if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukle()
@@ -156,9 +159,13 @@ if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukl
 # HIZLI İŞLEMLER
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
-    if tip == "MARKET":
-        mevcut = st.session_state.local_df[(st.session_state.local_df["Tip"] == "MARKET") & (st.session_state.local_df["Urun"] == isim)]
-        if not mevcut.empty: return
+    # Market veya Yemek ise çift kayıt engelle
+    mevcut = st.session_state.local_df[
+        (st.session_state.local_df["Tip"] == tip) & 
+        (st.session_state.local_df["Urun"] == isim)
+    ]
+    if not mevcut.empty: return
+
     row = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([row])], ignore_index=True)
     threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],)).start()
@@ -183,21 +190,10 @@ def hizli_yatirim_guncelle(isim, miktar, notlar):
         st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d")
         threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM")).start()
 
-def varsayilan_yemekleri_yukle():
-    KAHVALTI = ["Menemen", "Omlet", "Sucuklu Yumurta", "Pankek", "Kuymak", "Simit & Peynir", "Haşlanmış Yumurta", "Kahvaltı Tabağı", "Patates Kızartması", "Tost"]
-    YEMEK = ["Karnıyarık", "Kuru Fasulye & Pilav", "Mantı", "Köfte & Patates", "Tavuk Sote", "Balık & Salata", "Bezelye", "Ispanak", "Makarna", "Lahmacun", "Hamburger", "Pizza", "Mercimek Çorbası", "Türlü", "Dolma"]
-    
-    sayac = 0
-    for y in KAHVALTI:
-        hizli_ekle(y, "YEMEK_KAHVALTI", durum="1") # 1 = Çarkta aktif
-        sayac += 1
-        time.sleep(0.05)
-    for y in YEMEK:
-        hizli_ekle(y, "YEMEK_OGUN", durum="1")
-        sayac += 1
-        time.sleep(0.05)
-        
-    st.toast(f"✅ {sayac} çeşit yemek çarka eklendi!")
+def listeyi_temizle():
+    # RAM'deki çift kayıtları temizler
+    st.session_state.local_df = st.session_state.local_df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
+    st.toast("🧹 Liste temizlendi! Fazlalıklar silindi.")
     time.sleep(1)
     st.rerun()
 
@@ -225,7 +221,7 @@ def is_ekleme_callback():
 def yemek_ekle_callback(input_key, tip_kod):
     val = st.session_state[input_key]
     if val:
-        hizli_ekle(val, tip_kod, durum="1") # Yeni eklenen varsayılan olarak tikli gelir
+        hizli_ekle(val, tip_kod, durum="1") 
         st.session_state[input_key] = ""
 
 def ekleme_callback(key, tip):
@@ -449,8 +445,10 @@ def sayfa_ekonomi():
 def sayfa_yasam():
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎡 KAHVALTI ÇARKI", "🎡 YEMEK ÇARKI", "👨‍🍳 AI ŞEF", "⏳ SAYAÇ", "📒 NOTLAR"])
     
-    if st.button("📥 Varsayılan Yemekleri Yükle (İlk Kurulum)", key="btn_yemek_yukle", use_container_width=True):
-        varsayilan_yemekleri_yukle()
+    # 3. KAYITLARI SİL BUTONU (EN ÜSTTE DEĞİL, GİZLİ GİBİ OLSUN)
+    with st.expander("⚙️ Ayarlar / Temizlik"):
+        if st.button("🧹 Çift Kayıtları Temizle (Düzelt)", use_container_width=True):
+            listeyi_temizle()
 
     # KAHVALTI ÇARKI
     with tab1:
@@ -460,7 +458,6 @@ def sayfa_yasam():
         st.markdown("---")
         df_k = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_KAHVALTI"]
         
-        # Sadece tikli olanları havuza al
         havuz = df_k[df_k["Durum"] == "1"]["Urun"].tolist()
         if havuz:
             if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_kahvalti", type="primary", use_container_width=True):
