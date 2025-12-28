@@ -2,4 +2,3 @@ streamlit
 streamlit-gsheets
 pandas
 requests
-
