@@ -4,7 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import requests
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 import threading
 
 # ==============================================================================
@@ -49,7 +49,7 @@ def arka_planda_guncelle(urun_adi, yeni_durum):
     except: pass
 
 # ==============================================================================
-# YEREL VERİ
+# YEREL VERİ VE HIZLI İŞLEMLER
 # ==============================================================================
 def verileri_yukle():
     try:
@@ -77,28 +77,32 @@ def verileri_yukle():
 if 'local_df' not in st.session_state:
     st.session_state.local_df = verileri_yukle()
 
-# ==============================================================================
-# HIZLI İŞLEM FONKSİYONLARI
-# ==============================================================================
-def hizli_ekle(isim, tip, zaman=""):
-    yeni_satir = {"Urun": isim, "Durum": "0", "Mesaj": "", "Zaman": str(zaman), "Tip": tip}
+def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
+    # ÖDEME İÇİN YAPI:
+    # Urun: İsim
+    # Durum: Sıklık (HER_AY / TEK) -> Normal liste için "0"
+    # Mesaj: Saat (14:30) -> Normal liste için boş
+    # Zaman: Gün (15) -> Normal liste için boş
+    
+    yeni_satir = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
-    t = threading.Thread(target=arka_planda_ekle, args=([isim, "0", "", str(zaman), tip],))
+    
+    t = threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],))
     t.start()
 
 def hizli_sil(isim):
-    # İsim bazlı silme (Duplicate varsa hepsini siler, temizlik olur)
     st.session_state.local_df = st.session_state.local_df[st.session_state.local_df["Urun"] != isim]
     t = threading.Thread(target=arka_planda_sil, args=(isim,))
     t.start()
 
 def hizli_durum_degistir(isim, yeni_durum):
-    # Tüm aynı isimli ürünleri güncelle
-    st.session_state.local_df.loc[st.session_state.local_df["Urun"] == isim, "Durum"] = str(yeni_durum)
+    idx = st.session_state.local_df[st.session_state.local_df["Urun"] == isim].index
+    if not idx.empty:
+        st.session_state.local_df.at[idx[0], "Durum"] = str(yeni_durum)
     t = threading.Thread(target=arka_planda_guncelle, args=(isim, yeni_durum))
     t.start()
 
-# CALLBACKLER
+# CALLBACKLER (TEMİZLİK İŞLERİ)
 def ekleme_callback(input_key, tip):
     val = st.session_state[input_key]
     if val:
@@ -106,11 +110,19 @@ def ekleme_callback(input_key, tip):
         st.session_state[input_key] = ""
 
 def fatura_callback():
-    val = st.session_state.fat_ad
+    ad = st.session_state.fat_ad
     gun = st.session_state.fat_gun
-    if val:
-        hizli_ekle(val, "FATURA", gun)
+    saat = st.session_state.fat_saat
+    tekrar = st.session_state.fat_tekrar
+    
+    if ad:
+        # Durum sütununa TEKRAR bilgisini (HER_AY / TEK), Mesaj sütununa SAAT bilgisini kaydediyoruz
+        tekrar_kod = "HER_AY" if tekrar == "🔁 Her Ay" else "TEK"
+        saat_str = str(saat)[0:5] # 14:30:00 -> 14:30
+        
+        hizli_ekle(isim=ad, tip="FATURA", zaman=gun, mesaj=saat_str, durum=tekrar_kod)
         st.session_state.fat_ad = ""
+        # Not: Saat ve Radyo butonunu sıfırlamak Streamlit'te zordur, son seçim kalır, bu kullanıcı için iyidir.
 
 def bildirim_gonder(mesaj):
     try:
@@ -126,12 +138,11 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM (HATA ÇÖZÜLEN KISIM)
+# GÖRÜNÜM
 # ==============================================================================
 def liste_goster(liste_tipi):
     df = st.session_state.local_df
     
-    # Filtreleme
     if liste_tipi == "MARKET":
         mask = (df["Tip"] == "MARKET") | (df["Tip"] == "") | (df["Tip"] == "None")
         df_aktif = df[mask]
@@ -145,18 +156,15 @@ def liste_goster(liste_tipi):
         st.subheader(f"📌 Bekleyenler ({len(alinacaklar)})")
         if alinacaklar.empty: st.success("Tertemiz! 🎉")
         
-        # HATA BURADAYDI: Key olarak isim yerine 'index' kullanıyoruz
         for index, row in alinacaklar.iterrows():
             c1, c2 = st.columns([5, 1])
             with c1:
-                # Key artık benzersiz (index kullanıldı)
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{index}"):
                     hizli_durum_degistir(row['Urun'], "1")
                     st.rerun()
             with c2:
                 sil_key = f"del_{liste_tipi}_{index}"
                 conf_key = f"conf_{liste_tipi}_{index}"
-                
                 if not st.session_state.get(conf_key):
                     if st.button("🗑️", key=sil_key):
                         st.session_state[conf_key] = True
@@ -186,35 +194,52 @@ def fatura_listesi_goster():
     df = st.session_state.local_df
     df_fatura = df[df["Tip"] == "FATURA"]
     if df_fatura.empty:
-        st.info("Ödeme yok.")
+        st.info("Henüz ödeme eklenmedi.")
         return
 
-    st.subheader("🗓️ Aylık Ödemeler")
+    st.subheader("🗓️ Ödeme Takvimi")
     bugun = datetime.now().day
+    
+    # Hata önlemek için numeric dönüşüm
     df_fatura["Gun_Sayi"] = pd.to_numeric(df_fatura["Zaman"], errors='coerce').fillna(32)
     df_fatura = df_fatura.sort_values("Gun_Sayi")
 
     for index, row in df_fatura.iterrows():
         try:
-            odeme_gunu = int(row["Zaman"])
+            odeme_gunu = int(row["Gun_Sayi"])
             kalan = odeme_gunu - bugun
-            c1, c2, c3 = st.columns([3, 2, 1])
-            with c1: st.write(f"**{row['Urun']}**")
-            with c2:
-                if kalan == 0: st.error("❗ BUGÜN!")
-                elif kalan > 0: st.success(f"⏳ {kalan} gün")
-                else: st.caption(f"Ayın {odeme_gunu}'i")
-            with c3:
-                 if st.button("🗑️", key=f"del_fat_{index}"):
-                     hizli_sil(row['Urun'])
-                     st.rerun()
-            st.divider()
+            saat = row["Mesaj"] if row["Mesaj"] else "09:00"
+            tekrar = row["Durum"] # HER_AY veya TEK
+            
+            # İkon Seçimi
+            icon = "🔁" if tekrar == "HER_AY" else "1️⃣"
+            
+            # Kart Görünümü
+            with st.container():
+                c1, c2, c3 = st.columns([3, 2, 1])
+                with c1:
+                    st.write(f"**{row['Urun']}**")
+                    st.caption(f"🕒 Saat: {saat} | {icon}")
+                
+                with c2:
+                    if kalan == 0:
+                        st.error("❗ BUGÜN!")
+                    elif kalan > 0:
+                        st.success(f"⏳ {kalan} gün var")
+                    else:
+                        st.warning("Günü geçti")
+                
+                with c3:
+                    if st.button("🗑️", key=f"del_fat_{index}"):
+                        hizli_sil(row['Urun'])
+                        st.rerun()
+                st.divider()
         except: pass
 
 # ==============================================================================
 # ANA EKRAN
 # ==============================================================================
-st.markdown("<h3 style='text-align: center;'>⚡ Yunus Hocam'ın Hızlı Asistanı</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center;'>⚡ Ev Asistanı Pro</h3>", unsafe_allow_html=True)
 
 if st.button("🔄 Verileri Yenile", use_container_width=True):
     st.session_state.local_df = verileri_yukle()
@@ -241,20 +266,14 @@ with tab2:
     liste_goster("TODO")
 
 with tab3:
-    c1, c2, c3 = st.columns([3, 2, 1])
-    with c1:
-        st.text_input("Ödeme Adı", placeholder="Netflix...", label_visibility="collapsed", key="fat_ad")
-    with c2:
-        st.number_input("Ayın Günü", min_value=1, max_value=31, value=15, label_visibility="collapsed", key="fat_gun")
-    with c3:
-        st.button("EKLE", key="btn_f", on_click=fatura_callback, use_container_width=True)
-    st.markdown("---")
-    fatura_listesi_goster()
-
-with tab4:
-    with st.form("alarm"):
-        mesaj = st.text_input("Not", placeholder="Fırın...")
-        sure = st.number_input("Dakika", min_value=1, value=15)
-        if st.form_submit_button("🔔 Kur", use_container_width=True):
-            alarm_kur(mesaj, sure)
-            st.success("Kuruldu!")
+    # Gelişmiş Ekleme Formu
+    with st.expander("➕ Yeni Ödeme Ekle", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.text_input("Ödeme Adı", placeholder="Kira, Netflix...", key="fat_ad")
+            st.number_input("Ayın Günü", min_value=1, max_value=31, value=1, key="fat_gun")
+        with c2:
+            st.time_input("Hatırlatma Saati", value=dt_time(9, 0), key="fat_saat")
+            st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek Seferlik"], key="fat_tekrar")
+        
+        st.button("KAYDET", key
