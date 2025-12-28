@@ -13,7 +13,7 @@ import threading
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
-st.set_page_config(page_title="Hızlı Ev Paneli", page_icon="🏠", layout="centered")
+st.set_page_config(page_title="Ev Asistanı Pro", page_icon="🏠", layout="centered")
 
 # ==============================================================================
 # ARKA PLAN İŞÇİLERİ
@@ -49,7 +49,7 @@ def arka_planda_guncelle(urun_adi, yeni_durum):
     except: pass
 
 # ==============================================================================
-# YEREL VERİ VE HIZLI İŞLEMLER
+# YEREL VERİ YÖNETİMİ
 # ==============================================================================
 def verileri_yukle():
     try:
@@ -77,16 +77,12 @@ def verileri_yukle():
 if 'local_df' not in st.session_state:
     st.session_state.local_df = verileri_yukle()
 
+# ==============================================================================
+# HIZLI İŞLEM FONKSİYONLARI
+# ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
-    # ÖDEME İÇİN YAPI:
-    # Urun: İsim
-    # Durum: Sıklık (HER_AY / TEK) -> Normal liste için "0"
-    # Mesaj: Saat (14:30) -> Normal liste için boş
-    # Zaman: Gün (15) -> Normal liste için boş
-    
     yeni_satir = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
-    
     t = threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],))
     t.start()
 
@@ -102,7 +98,7 @@ def hizli_durum_degistir(isim, yeni_durum):
     t = threading.Thread(target=arka_planda_guncelle, args=(isim, yeni_durum))
     t.start()
 
-# CALLBACKLER (TEMİZLİK İŞLERİ)
+# CALLBACKLER
 def ekleme_callback(input_key, tip):
     val = st.session_state[input_key]
     if val:
@@ -116,13 +112,10 @@ def fatura_callback():
     tekrar = st.session_state.fat_tekrar
     
     if ad:
-        # Durum sütununa TEKRAR bilgisini (HER_AY / TEK), Mesaj sütununa SAAT bilgisini kaydediyoruz
         tekrar_kod = "HER_AY" if tekrar == "🔁 Her Ay" else "TEK"
-        saat_str = str(saat)[0:5] # 14:30:00 -> 14:30
-        
+        saat_str = str(saat)[0:5]
         hizli_ekle(isim=ad, tip="FATURA", zaman=gun, mesaj=saat_str, durum=tekrar_kod)
         st.session_state.fat_ad = ""
-        # Not: Saat ve Radyo butonunu sıfırlamak Streamlit'te zordur, son seçim kalır, bu kullanıcı için iyidir.
 
 def bildirim_gonder(mesaj):
     try:
@@ -138,7 +131,7 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM
+# GÖRÜNÜM FONKSİYONLARI
 # ==============================================================================
 def liste_goster(liste_tipi):
     df = st.session_state.local_df
@@ -200,7 +193,6 @@ def fatura_listesi_goster():
     st.subheader("🗓️ Ödeme Takvimi")
     bugun = datetime.now().day
     
-    # Hata önlemek için numeric dönüşüm
     df_fatura["Gun_Sayi"] = pd.to_numeric(df_fatura["Zaman"], errors='coerce').fillna(32)
     df_fatura = df_fatura.sort_values("Gun_Sayi")
 
@@ -209,23 +201,20 @@ def fatura_listesi_goster():
             odeme_gunu = int(row["Gun_Sayi"])
             kalan = odeme_gunu - bugun
             saat = row["Mesaj"] if row["Mesaj"] else "09:00"
-            tekrar = row["Durum"] # HER_AY veya TEK
-            
-            # İkon Seçimi
+            tekrar = row["Durum"]
             icon = "🔁" if tekrar == "HER_AY" else "1️⃣"
             
-            # Kart Görünümü
             with st.container():
                 c1, c2, c3 = st.columns([3, 2, 1])
                 with c1:
                     st.write(f"**{row['Urun']}**")
-                    st.caption(f"🕒 Saat: {saat} | {icon}")
+                    st.caption(f"🕒 {saat} | {icon}")
                 
                 with c2:
                     if kalan == 0:
                         st.error("❗ BUGÜN!")
                     elif kalan > 0:
-                        st.success(f"⏳ {kalan} gün var")
+                        st.success(f"⏳ {kalan} gün")
                     else:
                         st.warning("Günü geçti")
                 
@@ -266,7 +255,6 @@ with tab2:
     liste_goster("TODO")
 
 with tab3:
-    # Gelişmiş Ekleme Formu
     with st.expander("➕ Yeni Ödeme Ekle", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
@@ -276,4 +264,19 @@ with tab3:
             st.time_input("Hatırlatma Saati", value=dt_time(9, 0), key="fat_saat")
             st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek Seferlik"], key="fat_tekrar")
         
-        st.button("KAYDET", key
+        # HATA DÜZELTİLDİ: Parantez hatası olmasın diye alt alta yazdım
+        st.button("KAYDET", 
+                  key="btn_f", 
+                  on_click=fatura_callback, 
+                  use_container_width=True)
+    
+    st.markdown("---")
+    fatura_listesi_goster()
+
+with tab4:
+    with st.form("alarm"):
+        mesaj = st.text_input("Not", placeholder="Fırın...")
+        sure = st.number_input("Dakika", min_value=1, value=15)
+        if st.form_submit_button("🔔 Kur", use_container_width=True):
+            alarm_kur(mesaj, sure)
+            st.success("Kuruldu!")
