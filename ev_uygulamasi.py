@@ -32,37 +32,66 @@ st.markdown("""
     button {
         padding: 0.25rem 0.5rem !important;
     }
-    /* Hava Durumu Kutusu */
-    .weather-box {
-        background-color: #e8f4f8;
-        padding: 8px;
-        border-radius: 8px;
+    /* Karşılama Kutusu Tasarımı */
+    .welcome-box {
+        background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
         text-align: center;
-        border: 1px solid #b8dae6;
-        color: #0d47a1;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .welcome-title {
+        font-size: 20px;
         font-weight: bold;
         margin-bottom: 5px;
+    }
+    .welcome-note {
         font-size: 14px;
+        font-style: italic;
+        opacity: 0.9;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# HAVA DURUMU (HIZLANDIRILMIŞ - CACHED)
+# AKILLI KARŞILAMA PANELİ (HAVA DURUMU YERİNE)
 # ==============================================================================
-@st.cache_data(ttl=600) # 10 Dakika boyunca hafızada tut (Hızın Sırrı)
-def hava_durumu_cek():
-    try:
-        url = "https://wttr.in/Istanbul?format=%C+%t&lang=tr"
-        response = requests.get(url, timeout=2) # Max 2 saniye bekle
-        if response.status_code == 200:
-            return response.text.strip()
-    except: pass
-    return "Veri yok"
+def karsilama_paneli():
+    # 1. Saate Göre Selam
+    saat = datetime.now().hour
+    if 5 <= saat < 12:
+        selam = "Günaydın Yunus Hocam! ☀️"
+    elif 12 <= saat < 18:
+        selam = "Tünaydın Yunus Hocam! 👋"
+    elif 18 <= saat < 22:
+        selam = "İyi Akşamlar Yunus Hocam! 🌙"
+    else:
+        selam = "Gece Mesaisi mi? Kolay Gelsin! 🦉"
 
-def hava_durumu_goster():
-    durum = hava_durumu_cek()
-    st.markdown(f'<div class="weather-box">🌤️ İstanbul: {durum}</div>', unsafe_allow_html=True)
+    # 2. Rastgele Motivasyon / Hatırlatma
+    sozler = [
+        "💡 Bütçeni kontrol ettin mi? Para yönetimi önemlidir.",
+        "🐈 Prenses bugün çok uslu duruyor mu?",
+        "🚀 Bugün harika işler başaracaksın!",
+        "💧 Su içmeyi unutma, sağlık her şeyden önemli.",
+        "🏠 Ev düzeni, zihin düzenidir.",
+        "📅 Yarınki planlarını gözden geçirdin mi?",
+        "☕ Bir kahve molası verip dinlenmeyi hak ettin.",
+        "🛒 Market listesine bakmadan alışverişe çıkma!",
+        "💸 Yatırımların geleceğin teminatıdır.",
+        "⚡ Robot süpürgeyi çalıştırmayı unutma."
+    ]
+    secilen_soz = random.choice(sozler)
+
+    # 3. Ekrana Bas
+    st.markdown(f"""
+    <div class="welcome-box">
+        <div class="welcome-title">{selam}</div>
+        <div class="welcome-note">{secilen_soz}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==============================================================================
 # ARKA PLAN İŞÇİLERİ
@@ -165,7 +194,7 @@ if 'local_df' not in st.session_state:
     st.session_state.local_df = verileri_yukle()
 
 # ==============================================================================
-# HIZLI İŞLEM FONKSİYONLARI (OPTIMISTIC UI)
+# HIZLI İŞLEM FONKSİYONLARI
 # ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
     yeni_satir = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
@@ -200,16 +229,16 @@ def hizli_durum_degistir(isim, yeni_durum):
     t.start()
 
 # CALLBACKLER
-def ekleme_callback(input_key, tip, durum="0"):
+def ekleme_callback(input_key, tip):
     val = st.session_state[input_key]
     if val:
         if "," in val:
             parcalar = val.split(",")
             for p in parcalar:
                 temiz = p.strip()
-                if temiz: hizli_ekle(temiz, tip, durum=durum)
+                if temiz: hizli_ekle(temiz, tip)
         else:
-            hizli_ekle(val, tip, durum=durum)
+            hizli_ekle(val, tip)
         st.session_state[input_key] = ""
 
 def not_callback():
@@ -258,7 +287,7 @@ def alarm_kur(mesaj, sure):
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM BİLEŞENLERİ
+# GÖRÜNÜM PARÇALARI
 # ==============================================================================
 def silme_butonu_koy(key_prefix, urun_adi):
     sil_key = f"del_{key_prefix}_{urun_adi}"
@@ -276,12 +305,12 @@ def silme_butonu_koy(key_prefix, urun_adi):
         st.caption("İptal: Yenile")
 
 # ==============================================================================
-# ALT MENÜ: EV ASİSTANI (ANA SAYFA)
+# MENÜ: ANA SAYFA
 # ==============================================================================
 def sayfa_ana_ekran():
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
 
-    # --- MARKET ---
+    # MARKET
     with tab1:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Market", placeholder="Ürün...", label_visibility="collapsed", key="market_giris")
@@ -291,7 +320,6 @@ def sayfa_ana_ekran():
         df = st.session_state.local_df
         mask = (df["Tip"] == "MARKET") | (df["Tip"] == "") | (df["Tip"] == "None")
         df_aktif = df[mask]
-        
         alinacaklar = df_aktif[df_aktif["Durum"] == "0"]
         tamamlananlar = df_aktif[df_aktif["Durum"] == "1"]
 
@@ -315,7 +343,7 @@ def sayfa_ana_ekran():
                         st.rerun()
                 with c_b: silme_butonu_koy(f"fin_m_{index}", row['Urun'])
 
-    # --- İŞLER ---
+    # İŞLER
     with tab2:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Görev", placeholder="İş...", label_visibility="collapsed", key="is_giris")
@@ -345,7 +373,7 @@ def sayfa_ana_ekran():
                         st.rerun()
                 with c_b: silme_butonu_koy(f"fin_t_{index}", row['Urun'])
 
-    # --- ALARM ---
+    # ALARM
     with tab3:
         with st.form("alarm"):
             mesaj = st.text_input("Not", placeholder="Fırın...")
@@ -376,12 +404,11 @@ def sayfa_ana_ekran():
                 except: pass
 
 # ==============================================================================
-# ALT MENÜ: EKONOMİ (ÖDEME, BÜTÇE, YATIRIM)
+# MENÜ: EKONOMİ
 # ==============================================================================
 def sayfa_ekonomi():
     tab1, tab2, tab3 = st.tabs(["💸 ÖDEME", "💰 BÜTÇE", "📈 YATIRIM"])
 
-    # --- ÖDEME ---
     with tab1:
         with st.expander("➕ Yeni Ödeme", expanded=True):
             c1, c2 = st.columns(2)
@@ -393,7 +420,6 @@ def sayfa_ekonomi():
                 st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek Seferlik"], key="fat_tekrar")
             st.button("KAYDET", key="btn_f", on_click=fatura_callback, use_container_width=True)
         st.markdown("---")
-        
         df_fatura = st.session_state.local_df[st.session_state.local_df["Tip"] == "FATURA"]
         if not df_fatura.empty:
             bugun = datetime.now().day
@@ -418,7 +444,6 @@ def sayfa_ekonomi():
                     st.divider()
                 except: pass
 
-    # --- BÜTÇE ---
     with tab2:
         with st.expander("➕ Gelir / Gider Ekle", expanded=True):
             c1, c2 = st.columns(2)
@@ -435,7 +460,6 @@ def sayfa_ekonomi():
         if not df_butce.empty:
             df_butce["TarihObj"] = pd.to_datetime(df_butce["Zaman"], errors='coerce').fillna(datetime.now())
             df_butce["Ay_Yil"] = df_butce["TarihObj"].dt.strftime('%Y-%m')
-            
             gruplar = sorted(df_butce["Ay_Yil"].unique(), reverse=True)
             for grup in gruplar:
                 bu_ay_str = datetime.now().strftime("%Y-%m")
@@ -455,7 +479,6 @@ def sayfa_ekonomi():
                         with c_b: st.write(f"{row['Mesaj']} ₺")
                         with c_c: silme_butonu_koy(f"butce_{index}", row['Urun'])
 
-    # --- YATIRIM ---
     with tab3:
         with st.expander("➕ Varlık Ekle", expanded=True):
             c1, c2 = st.columns(2)
@@ -482,12 +505,11 @@ def sayfa_ekonomi():
                 st.divider()
 
 # ==============================================================================
-# ALT MENÜ: YAŞAM (YEMEK, NOTLAR)
+# MENÜ: YAŞAM
 # ==============================================================================
 def sayfa_yasam():
     tab1, tab2 = st.tabs(["🍽️ YEMEK ÇARKI", "📒 NOTLAR"])
 
-    # --- YEMEK ---
     with tab1:
         st.caption("Yemekleri ekle, yanındaki kutucuğu işaretle ve kura çek!")
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
@@ -495,46 +517,39 @@ def sayfa_yasam():
         with c2: st.button("EKLE", key="btn_ymk", on_click=ekleme_callback, args=("yemek_giris", "YEMEK"), use_container_width=True)
         
         st.markdown("---")
-        
         df_yemek = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK"]
-        
-        # Seçili olanlar (Durum = 1)
         secili_olanlar = df_yemek[df_yemek["Durum"] == "1"]["Urun"].tolist()
         
         if secili_olanlar:
-            st.info(f"🎯 Kura Havuzu ({len(secili_olanlar)}): {', '.join(secili_olanlar)}")
+            st.info(f"🎯 Havuz ({len(secili_olanlar)}): {', '.join(secili_olanlar)}")
             if st.button("🎲 KURA ÇEK", type="primary", use_container_width=True):
                 secilen = random.choice(secili_olanlar)
                 st.balloons()
                 st.success(f"🍽️ Akşama Ne Yesek: **{secilen}**")
         else:
-            st.warning("Listeden yemek seçmedin! Aşağıdan kutucukları işaretle.")
+            st.warning("Hiçbir yemeği seçmedin!")
 
         st.divider()
         st.subheader("📋 Yemek Listesi")
         for index, row in df_yemek.iterrows():
             c_a, c_b = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
             with c_a:
-                # Durum 1 ise işaretli gelir, basınca 0 olur. Tersi de geçerli.
                 is_checked = (row['Durum'] == "1")
                 if st.checkbox(f"**{row['Urun']}**", value=is_checked, key=f"ymk_chk_{index}"):
                     if not is_checked: hizli_durum_degistir(row['Urun'], "1")
                 else:
                     if is_checked: hizli_durum_degistir(row['Urun'], "0")
-                    
             with c_b: silme_butonu_koy(f"ymk_{index}", row['Urun'])
 
-    # --- NOTLAR ---
     with tab2:
-        st.caption("Wi-Fi şifresi, IBAN, Tarifler vb.")
         with st.expander("➕ Yeni Not Ekle", expanded=True):
-            st.text_input("Başlık", placeholder="Wifi Şifresi...", key="not_baslik")
-            st.text_area("İçerik", placeholder="sifre123...", key="not_icerik")
+            st.text_input("Başlık", placeholder="Wifi...", key="not_baslik")
+            st.text_area("İçerik", placeholder="sifre...", key="not_icerik")
             st.button("KAYDET", key="btn_not", on_click=not_callback, use_container_width=True)
         
         st.markdown("---")
         df_not = st.session_state.local_df[st.session_state.local_df["Tip"] == "NOTE"]
-        if df_not.empty: st.info("Henüz not yok.")
+        if df_not.empty: st.info("Not yok.")
         for index, row in df_not.iterrows():
             with st.expander(f"📒 {row['Urun']}"):
                 st.code(row['Mesaj']) 
@@ -542,33 +557,26 @@ def sayfa_yasam():
                 silme_butonu_koy(f"not_{index}", row['Urun'])
 
 # ==============================================================================
-# DOSYA ÇEVİRİCİ
+# MENÜ: DOSYA ÇEVİRİCİ
 # ==============================================================================
 def sayfa_dosya_cevirici():
     st.subheader("📂 Dosya Çevirici Bot")
-    dosya = st.file_uploader("Dosya", type=["png", "jpg", "jpeg", "docx", "xlsx"])
+    dosya = st.file_uploader("Dosya", type=["png", "jpg", "jpeg"])
     if dosya:
         st.success("Yüklendi!")
         if st.button("PDF'e Çevir"):
-             if dosya.type in ["image/png", "image/jpeg", "image/jpg"]:
+            try:
                 import img2pdf
                 st.download_button("⬇️ İndir", img2pdf.convert(dosya.read()), f"{dosya.name}.pdf", "application/pdf")
-             else:
-                st.warning("Bu dosya formatı için sunucu lisansı gerekiyor.")
+            except: st.error("Hata")
 
 # ==============================================================================
-# ANA İSKELET (SOL MENÜ)
+# ANA İSKELET
 # ==============================================================================
-hava_durumu_goster()
-
-# Menüyü Grupla
+karsilama_paneli()
 secim = st.sidebar.radio("Menü", ["🏠 Ana Sayfa", "💰 Ekonomi", "🧬 Yaşam", "📂 Dosya Çevirici"])
 
-if secim == "🏠 Ana Sayfa":
-    sayfa_ana_ekran()
-elif secim == "💰 Ekonomi":
-    sayfa_ekonomi()
-elif secim == "🧬 Yaşam":
-    sayfa_yasam()
-elif secim == "📂 Dosya Çevirici":
-    sayfa_dosya_cevirici()
+if secim == "🏠 Ana Sayfa": sayfa_ana_ekran()
+elif secim == "💰 Ekonomi": sayfa_ekonomi()
+elif secim == "🧬 Yaşam": sayfa_yasam()
+elif secim == "📂 Dosya Çevirici": sayfa_dosya_cevirici()
