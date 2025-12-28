@@ -16,10 +16,9 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Hızlı Ev Paneli", page_icon="🏠", layout="centered")
 
 # ==============================================================================
-# ARKA PLAN İŞÇİLERİ (GİZLİ KAHRAMANLAR)
+# ARKA PLAN İŞÇİLERİ
 # ==============================================================================
 def get_client():
-    """Her thread kendi bağlantısını açar"""
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["connections"]["gsheets"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
@@ -27,41 +26,34 @@ def get_client():
     return client
 
 def arka_planda_ekle(satir_verisi):
-    """Google'a veriyi arkadan gönderir"""
     try:
         client = get_client()
         sheet = client.open(DOSYA_ADI).sheet1
         sheet.append_row(satir_verisi)
-    except Exception as e:
-        print(f"Senkron hatası (Ekle): {e}")
+    except Exception as e: print(f"Hata: {e}")
 
 def arka_planda_sil(urun_adi):
-    """Google'dan veriyi arkadan siler"""
     try:
         client = get_client()
         sheet = client.open(DOSYA_ADI).sheet1
         cell = sheet.find(urun_adi)
         sheet.delete_rows(cell.row)
-    except Exception as e:
-        print(f"Senkron hatası (Sil): {e}")
+    except: pass
 
 def arka_planda_guncelle(urun_adi, yeni_durum):
-    """Google'da durumu arkadan günceller"""
     try:
         client = get_client()
         sheet = client.open(DOSYA_ADI).sheet1
         cell = sheet.find(urun_adi)
         sheet.update_cell(cell.row, 2, str(yeni_durum))
-    except Exception as e:
-        print(f"Senkron hatası (Güncelle): {e}")
+    except: pass
 
 # ==============================================================================
-# YEREL VERİ YÖNETİMİ (HIZ İÇİN RAM KULLANIMI)
+# YEREL VERİ YÖNETİMİ
 # ==============================================================================
 def verileri_yukle():
-    """Veriyi sadece ilk açılışta Google'dan çeker"""
-    client = get_client()
     try:
+        client = get_client()
         sheet = client.open(DOSYA_ADI).sheet1
         data = sheet.get_all_values()
         BASLIKLAR = ["Urun", "Durum", "Mesaj", "Zaman", "Tip"]
@@ -70,14 +62,12 @@ def verileri_yukle():
             sheet.append_row(BASLIKLAR)
             return pd.DataFrame(columns=BASLIKLAR)
 
-        # Başlık kontrolü ve düzeltme
         if data[0] != BASLIKLAR:
             if "Urun" not in data[0]:
                 sheet.insert_row(BASLIKLAR, 1)
                 data = sheet.get_all_values()
         
         df = pd.DataFrame(data[1:], columns=data[0])
-        # Temizlik
         for col in BASLIKLAR:
             if col not in df.columns: df[col] = ""
         
@@ -85,37 +75,30 @@ def verileri_yukle():
     except:
         return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
 
-# Session State Başlat (RAM Hafızası)
 if 'local_df' not in st.session_state:
     st.session_state.local_df = verileri_yukle()
 
 # ==============================================================================
-# HIZLI İŞLEM FONKSİYONLARI (ANINDA TEPKİ)
+# HIZLI İŞLEM FONKSİYONLARI
 # ==============================================================================
-def hizli_ekle(isim, tip):
-    # 1. Ekranda hemen göster (RAM'e ekle)
-    yeni_satir = {"Urun": isim, "Durum": "0", "Mesaj": "", "Zaman": "", "Tip": tip}
+def hizli_ekle(isim, tip, zaman=""):
+    # RAM'e ekle
+    yeni_satir = {"Urun": isim, "Durum": "0", "Mesaj": "", "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([yeni_satir])], ignore_index=True)
     
-    # 2. Arka planda Google'a gönder (Thread)
-    t = threading.Thread(target=arka_planda_ekle, args=([isim, "0", "", "", tip],))
+    # Google'a gönder
+    t = threading.Thread(target=arka_planda_ekle, args=([isim, "0", "", str(zaman), tip],))
     t.start()
 
 def hizli_sil(isim):
-    # 1. Ekranda hemen sil
     st.session_state.local_df = st.session_state.local_df[st.session_state.local_df["Urun"] != isim]
-    
-    # 2. Arka planda Google'dan sil
     t = threading.Thread(target=arka_planda_sil, args=(isim,))
     t.start()
 
 def hizli_durum_degistir(isim, yeni_durum):
-    # 1. Ekranda hemen güncelle
     idx = st.session_state.local_df[st.session_state.local_df["Urun"] == isim].index
     if not idx.empty:
         st.session_state.local_df.at[idx[0], "Durum"] = str(yeni_durum)
-    
-    # 2. Arka planda Google'ı güncelle
     t = threading.Thread(target=arka_planda_guncelle, args=(isim, yeni_durum))
     t.start()
 
@@ -128,17 +111,15 @@ def bildirim_gonder(mesaj):
 
 def alarm_kur(mesaj, sure):
     hedef = datetime.now() + timedelta(minutes=sure)
-    hedef_str = hedef.strftime("%Y-%m-%d %H:%M:%S")
-    # Alarmlar genelde kritik değildir, direkt arkaya atalım
-    t = threading.Thread(target=arka_planda_ekle, args=(["", "-1", mesaj, hedef_str, "ALARM"],))
+    t = threading.Thread(target=arka_planda_ekle, args=(["", "-1", mesaj, hedef.strftime("%Y-%m-%d %H:%M:%S"), "ALARM"],))
     t.start()
     bildirim_gonder(f"✅ Alarm: {sure} dk sonra '{mesaj}'")
 
 # ==============================================================================
-# GÖRÜNÜM (AYNI KALDI)
+# GÖRÜNÜM BİLEŞENLERİ
 # ==============================================================================
 def liste_goster(liste_tipi):
-    df = st.session_state.local_df # RAM'den oku (HIZLI)
+    df = st.session_state.local_df
     
     if liste_tipi == "MARKET":
         mask = (df["Tip"] == "MARKET") | (df["Tip"] == "") | (df["Tip"] == "None")
@@ -151,12 +132,11 @@ def liste_goster(liste_tipi):
         tamamlananlar = df_aktif[df_aktif["Durum"] == "1"]
 
         st.subheader(f"📌 Bekleyenler ({len(alinacaklar)})")
-        if alinacaklar.empty: st.success("Temiz! 🎉")
+        if alinacaklar.empty: st.success("Tertemiz! 🎉")
         
         for index, row in alinacaklar.iterrows():
             c1, c2 = st.columns([5, 1])
             with c1:
-                # Checkbox
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{liste_tipi}_{row['Urun']}"):
                     hizli_durum_degistir(row['Urun'], "1")
                     st.rerun()
@@ -173,11 +153,10 @@ def liste_goster(liste_tipi):
                         hizli_sil(row['Urun'])
                         st.session_state[conf_key] = False
                         st.rerun()
-                    st.caption("İptal: Yenile")
         
         st.divider()
 
-        baslik = "📦 Evde Var / Geçmiş" if liste_tipi == "MARKET" else "✅ Biten İşler"
+        baslik = "📦 Geçmiş" if liste_tipi == "MARKET" else "✅ Biten İşler"
         with st.expander(f"{baslik} ({len(tamamlananlar)})"):
             for index, row in tamamlananlar.iterrows():
                 c_a, c_b = st.columns([4, 1])
@@ -189,46 +168,112 @@ def liste_goster(liste_tipi):
                     if st.button("🗑️", key=f"delfin_{liste_tipi}_{row['Urun']}"):
                         hizli_sil(row['Urun'])
                         st.rerun()
-    else:
-        st.info("Liste boş.")
+
+# ==============================================================================
+# FATURA HESAPLAMA MODÜLÜ (YENİ)
+# ==============================================================================
+def fatura_listesi_goster():
+    df = st.session_state.local_df
+    df_fatura = df[df["Tip"] == "FATURA"]
+    
+    if df_fatura.empty:
+        st.info("Henüz ekli fatura/ödeme yok.")
+        return
+
+    st.subheader("🗓️ Aylık Ödemeler")
+    bugun = datetime.now().day
+    
+    # Sıralama yapabilmek için günü sayıya çevir
+    df_fatura["Gun_Sayi"] = pd.to_numeric(df_fatura["Zaman"], errors='coerce').fillna(32)
+    df_fatura = df_fatura.sort_values("Gun_Sayi")
+
+    for index, row in df_fatura.iterrows():
+        try:
+            odeme_gunu = int(row["Zaman"])
+            kalan = odeme_gunu - bugun
+            
+            c1, c2, c3 = st.columns([3, 2, 1])
+            
+            with c1:
+                st.write(f"**{row['Urun']}**")
+            
+            with c2:
+                if kalan == 0:
+                    st.error("❗ BUGÜN!")
+                elif kalan > 0:
+                    st.success(f"⏳ {kalan} gün kaldı")
+                else:
+                    st.caption(f"Gelecek ayın {odeme_gunu}'si")
+            
+            with c3:
+                 if st.button("🗑️", key=f"del_fat_{row['Urun']}"):
+                     hizli_sil(row['Urun'])
+                     st.rerun()
+            st.divider()
+        except:
+            st.error(f"Hatalı tarih: {row['Urun']}")
 
 # ==============================================================================
 # ANA EKRAN
 # ==============================================================================
 st.markdown("<h3 style='text-align: center;'>⚡ Yunus Hocam'ın Hızlı Asistanı</h3>", unsafe_allow_html=True)
 
-# Manuel Yenileme Butonu (Senkronize Etmek İçin)
-if st.button("🔄 Verileri Google'dan Taze Çek", use_container_width=True):
+if st.button("🔄 Verileri Yenile", use_container_width=True):
     st.session_state.local_df = verileri_yukle()
     st.rerun()
 
-tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 YAPILACAKLAR", "⏰ ALARM"])
+# 4 SEKME
+tab1, tab2, tab3, tab4 = st.tabs(["🛒 MARKET", "📝 İŞLER", "💸 ÖDEMELER", "⏰ ALARM"])
 
+# --- MARKET ---
 with tab1:
     c1, c2 = st.columns([3, 1])
     with c1:
-        yeni_m = st.text_input("Market", placeholder="Ürün...", label_visibility="collapsed", key="in_m")
+        # Key verdik: "market_giris"
+        st.text_input("Market", placeholder="Ürün...", label_visibility="collapsed", key="market_giris")
     with c2:
         if st.button("EKLE", key="btn_m", use_container_width=True):
-            if yeni_m:
-                hizli_ekle(yeni_m, "MARKET")
-                st.rerun() # Bekleme yok!
+            if st.session_state.market_giris:
+                hizli_ekle(st.session_state.market_giris, "MARKET")
+                # HİLE BURADA: İçini boşaltıyoruz
+                st.session_state.market_giris = "" 
+                st.rerun()
     st.markdown("---")
     liste_goster("MARKET")
 
+# --- İŞLER ---
 with tab2:
     c1, c2 = st.columns([3, 1])
     with c1:
-        yeni_t = st.text_input("Görev", placeholder="İş...", label_visibility="collapsed", key="in_t")
+        st.text_input("Görev", placeholder="İş...", label_visibility="collapsed", key="is_giris")
     with c2:
         if st.button("EKLE", key="btn_t", use_container_width=True):
-            if yeni_t:
-                hizli_ekle(yeni_t, "TODO")
-                st.rerun() # Bekleme yok!
+            if st.session_state.is_giris:
+                hizli_ekle(st.session_state.is_giris, "TODO")
+                st.session_state.is_giris = "" # Boşalt
+                st.rerun()
     st.markdown("---")
     liste_goster("TODO")
 
+# --- ÖDEMELER (YENİ) ---
 with tab3:
+    st.caption("Her ay tekrarlanan ödemeleri ekle (Örn: Kira, Netflix)")
+    c1, c2, c3 = st.columns([3, 2, 1])
+    with c1:
+        st.text_input("Ödeme Adı", placeholder="Netflix...", label_visibility="collapsed", key="fat_ad")
+    with c2:
+        st.number_input("Ayın Günü", min_value=1, max_value=31, value=15, label_visibility="collapsed", key="fat_gun")
+    with c3:
+        if st.button("EKLE", key="btn_f", use_container_width=True):
+            if st.session_state.fat_ad:
+                hizli_ekle(st.session_state.fat_ad, "FATURA", st.session_state.fat_gun)
+                st.session_state.fat_ad = "" # Boşalt
+                st.rerun()
+    st.markdown("---")
+    fatura_listesi_goster()
+
+# --- ALARM ---
+with tab4:
     with st.form("alarm"):
         mesaj = st.text_input("Not", placeholder="Fırın...")
         sure = st.number_input("Dakika", min_value=1, value=15)
