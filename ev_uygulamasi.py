@@ -26,11 +26,11 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS VE JAVASCRIPT (V52 - ZORLA YAN YANA TUTMA & FIXLER)
+# 🖼️ CSS VE JAVASCRIPT (V53 - MOBİL FIT & NO SCROLL FIX)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
-# 1. HTML HEAD (İkonlar için Meta Etiketleri)
+# 1. HTML HEAD
 st.markdown(f"""
     <head>
         <link rel="icon" href="{APP_ICON_URL}">
@@ -38,33 +38,49 @@ st.markdown(f"""
         <link rel="shortcut icon" href="{APP_ICON_URL}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-title" content="Ev Asistanı">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     </head>
 """, unsafe_allow_html=True)
 
-# 2. CSS (ZORLA YAN YANA TUTMA)
+# 2. CSS (MÜKEMMEL UYUM)
 st.markdown("""
     <style>
-    /* 1. SÜTUNLARI ASLA ALT SATIRA İNDİRME (KRİTİK KOD) */
-    div[data-testid="stHorizontalBlock"] {
-        flex-wrap: nowrap !important; /* Asla sarma */
-        align-items: center !important;
-        gap: 5px !important;
+    /* GENEL SAYFA AYARLARI (Yatay Kaymayı Engelle) */
+    .main .block-container {
+        max-width: 100vw;
+        overflow-x: hidden !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
     
-    /* 2. BUTON BOYUTLARI VE HİZALAMA */
+    /* SATIRLARI KİLİTLE (Asla alt alta inmesin) */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 2px !important; /* Aradaki boşluğu azalttık */
+    }
+    
+    /* SÜTUN AYARLARI (Kritik Nokta) */
+    div[data-testid="column"] {
+        min-width: 0 !important; /* İçeriğin sütunu genişletmesini engelle */
+    }
+    
+    /* UZUN METİNLERİ KISALT (...) */
+    div[data-testid="column"]:nth-of-type(1) p, 
+    div[data-testid="column"]:nth-of-type(1) label {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+        width: 100% !important;
+    }
+    
+    /* BUTONLARI MOBİLDE KÜÇÜLT */
     button {
-        padding: 0rem 0.5rem !important;
+        padding: 0rem 0.2rem !important; /* Boşlukları sıfıra yakın yap */
         min-height: 40px !important;
         height: 40px !important;
-        line-height: 1 !important;
-        white-space: nowrap !important;
-    }
-    
-    /* 3. İSİM SÜTUNU ÇOK UZUNSA EKANDAN TAŞMASIN, ... KOYSUN */
-    div[data-testid="column"]:nth-of-type(1) {
-        min-width: 0; /* Flexbox taşmasını önler */
-        flex-grow: 1;
-        overflow: hidden;
+        width: 100% !important; /* Sütuna tam otursun */
     }
     
     /* GÖRSEL KUTULAR */
@@ -87,21 +103,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. JAVASCRIPT (YUKARI ÇIK BUTONU - PARENT WINDOW FIX)
+# 3. JAVASCRIPT (YUKARI ÇIK BUTONU)
 components.html("""
 <script>
-    function topaGit() {
-        // Iframe içinden ana pencereyi kaydır
-        window.parent.scrollTo({top: 0, behavior: 'smooth'});
-    }
+    function topaGit() { window.parent.scrollTo({top: 0, behavior: 'smooth'}); }
 </script>
 <button onclick="topaGit()" style="
     position: fixed; bottom: 20px; left: 20px;
     background-color: #FF4B4B; color: white;
-    border: none; padding: 15px; border-radius: 50%;
-    font-size: 20px; cursor: pointer;
+    border: none; padding: 0; border-radius: 50%;
+    font-size: 24px; cursor: pointer;
     box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-    z-index: 999999; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px;">
+    z-index: 999999; width: 50px; height: 50px;
+    display: flex; align-items: center; justify-content: center;">
     ⬆️
 </button>
 """, height=0)
@@ -361,7 +375,7 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# V52: DÜZENLEME VE LİSTELEME MODÜLÜ (YAN YANA GARANTİ)
+# V53: LİSTELEME MODÜLÜ (SATIŞMAMA GARANTİLİ)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
@@ -376,8 +390,9 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.session_state[f"editing_{prefix}"] = None
                 st.rerun()
     else:
-        # SÜTUN ORANLARI (Mobilde yan yana sığması için)
-        c1, c2, c3 = st.columns([0.65, 0.17, 0.18], gap="small", vertical_alignment="center")
+        # SÜTUN ORANLARI: İsim sütununa %60 veriyoruz, diğerlerine %20
+        # CSS'de bu oranları koruyarak sıkıştırıyoruz
+        c1, c2, c3 = st.columns([0.60, 0.20, 0.20], gap="small", vertical_alignment="center")
         
         with c1:
             if checkbox_var:
@@ -404,7 +419,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                     st.rerun()
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.65, 0.17, 0.18], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.60, 0.20, 0.20], gap="small", vertical_alignment="center")
     with c1:
         if st.button(f"➕ {row['Urun']}", key=f"back_{prefix}_{i}", use_container_width=True):
             hizli_durum_degistir(row['Urun'], "0")
