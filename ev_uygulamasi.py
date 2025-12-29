@@ -23,65 +23,67 @@ except ImportError:
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
-# TARAYICI SEKME AYARI (Browser Tab)
+# TARAYICI SEKME AYARI
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ MOBİL UYGULAMA SİMGESİ VE CSS (V51 GÜNCELLEMESİ)
+# 🖼️ MOBİL UYGULAMA SİMGESİ VE CSS (DÜZELTİLMİŞ)
 # ==============================================================================
-# Telefonda "Ana Ekrana Ekle" dediğinde çıkacak o güzel ikon burada:
-# (Yüksek kaliteli 3D bir ev ikonu kullandım)
+# 1. KISIM: İKON (Değişken olduğu için f-string kullanıyoruz)
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
-
 st.markdown(f"""
     <head>
         <link rel="apple-touch-icon" href="{APP_ICON_URL}">
         <link rel="shortcut icon" href="{APP_ICON_URL}">
     </head>
+""", unsafe_allow_html=True)
+
+# 2. KISIM: CSS (Sabit olduğu için normal string kullanıyoruz - HATA BURADAYDI ÇÖZÜLDÜ)
+st.markdown("""
     <style>
     /* MOBİL İÇİN BUTONLARI YAN YANA TUTMA */
-    div[data-testid="column"] {{
+    div[data-testid="column"] {
         display: flex;
-        align-items: center; /* Dikey ortala */
+        align-items: center;
         justify-content: center;
-    }}
+    }
     
-    /* Butonların içindeki boşlukları azalt ki mobilde sığsın */
-    button {{
+    /* Butonların içindeki boşlukları azalt */
+    button {
         padding: 0.2rem 0.5rem !important;
         min-height: 35px !important;
-    }}
+    }
 
     /* KUTULAR VE GÖRSELLİK */
-    .welcome-box {{
+    .welcome-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; padding: 20px; border-radius: 15px;
         text-align: center; margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }}
-    .prenses-box {{
+    }
+    .prenses-box {
         background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
         color: #5e4a18; padding: 20px; border-radius: 15px;
         text-align: center; margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         border: 2px solid white;
-    }}
-    .welcome-title {{ font-size: 24px; font-weight: bold; margin-bottom: 5px; }}
-    .welcome-note {{ font-size: 16px; font-style: italic; opacity: 0.9; }}
+    }
+    .welcome-title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+    .welcome-note { font-size: 16px; font-style: italic; opacity: 0.9; }
     
     /* KATEGORİ ÇİZGİLERİ */
-    .category-line {{ height: 4px; border-radius: 2px; margin-bottom: 8px; }}
+    .category-line { height: 4px; border-radius: 2px; margin-bottom: 8px; }
     
     /* YUKARI ÇIK BUTONU (SABİT) */
-    .scroll-to-top {{
+    .scroll-to-top {
         position: fixed; bottom: 20px; left: 20px;
         background-color: #FF4B4B; color: white;
         padding: 10px 15px; border-radius: 50%;
         text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         z-index: 9999; font-weight: bold; cursor: pointer;
         opacity: 0.8; transition: opacity 0.3s;
-    }}
-    .scroll-to-top:hover {{ opacity: 1; }}
+    }
+    .scroll-to-top:hover { opacity: 1; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -215,7 +217,7 @@ def hizli_sil(isim):
     threading.Thread(target=arka_planda_sil, args=(isim,)).start()
 
 def hizli_duzenle(eski_isim, yeni_isim):
-    # DÜZENLEME FIX: Hem local df'i hem bulutu günceller
+    # DÜZENLEME FIX
     if not yeni_isim or eski_isim == yeni_isim: return
 
     # Local güncelle
