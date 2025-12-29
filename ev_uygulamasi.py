@@ -92,8 +92,7 @@ class TuyaCloud:
         t = str(int(time.time() * 1000))
         
         # Token İmzası
-       sign_str = "GET\n" + self.access_id + t # Bazı projeler bunu ister
-# (Not: Eğer bu hata verirse eski haline döndürürsün)
+        sign_str = "GET\n" + self.access_id + t # Bazı projeler bunu ister # (Not: Eğer bu hata verirse eski haline döndürürsün)
         sign = hmac.new(self.access_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
         
         headers = {'client_id': self.access_id, 'sign': sign, 't': t, 'sign_method': 'HMAC-SHA256'}
@@ -785,5 +784,6 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
