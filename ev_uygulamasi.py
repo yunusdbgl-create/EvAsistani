@@ -23,38 +23,51 @@ except ImportError:
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
-# TARAYICI SEKME AYARI
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ MOBİL UYGULAMA SİMGESİ VE CSS (DÜZELTİLMİŞ)
+# 🖼️ CSS VE JAVASCRIPT (V52 - ZORLA YAN YANA TUTMA & FIXLER)
 # ==============================================================================
-# 1. KISIM: İKON (Değişken olduğu için f-string kullanıyoruz)
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
+
+# 1. HTML HEAD (İkonlar için Meta Etiketleri)
 st.markdown(f"""
     <head>
+        <link rel="icon" href="{APP_ICON_URL}">
         <link rel="apple-touch-icon" href="{APP_ICON_URL}">
         <link rel="shortcut icon" href="{APP_ICON_URL}">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="Ev Asistanı">
     </head>
 """, unsafe_allow_html=True)
 
-# 2. KISIM: CSS (Sabit olduğu için normal string kullanıyoruz - HATA BURADAYDI ÇÖZÜLDÜ)
+# 2. CSS (ZORLA YAN YANA TUTMA)
 st.markdown("""
     <style>
-    /* MOBİL İÇİN BUTONLARI YAN YANA TUTMA */
-    div[data-testid="column"] {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* 1. SÜTUNLARI ASLA ALT SATIRA İNDİRME (KRİTİK KOD) */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important; /* Asla sarma */
+        align-items: center !important;
+        gap: 5px !important;
     }
     
-    /* Butonların içindeki boşlukları azalt */
+    /* 2. BUTON BOYUTLARI VE HİZALAMA */
     button {
-        padding: 0.2rem 0.5rem !important;
-        min-height: 35px !important;
+        padding: 0rem 0.5rem !important;
+        min-height: 40px !important;
+        height: 40px !important;
+        line-height: 1 !important;
+        white-space: nowrap !important;
     }
-
-    /* KUTULAR VE GÖRSELLİK */
+    
+    /* 3. İSİM SÜTUNU ÇOK UZUNSA EKANDAN TAŞMASIN, ... KOYSUN */
+    div[data-testid="column"]:nth-of-type(1) {
+        min-width: 0; /* Flexbox taşmasını önler */
+        flex-grow: 1;
+        overflow: hidden;
+    }
+    
+    /* GÖRSEL KUTULAR */
     .welcome-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; padding: 20px; border-radius: 15px;
@@ -70,26 +83,25 @@ st.markdown("""
     }
     .welcome-title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
     .welcome-note { font-size: 16px; font-style: italic; opacity: 0.9; }
-    
-    /* KATEGORİ ÇİZGİLERİ */
     .category-line { height: 4px; border-radius: 2px; margin-bottom: 8px; }
-    
-    /* YUKARI ÇIK BUTONU (SABİT) */
-    .scroll-to-top {
-        position: fixed; bottom: 20px; left: 20px;
-        background-color: #FF4B4B; color: white;
-        padding: 10px 15px; border-radius: 50%;
-        text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        z-index: 9999; font-weight: bold; cursor: pointer;
-        opacity: 0.8; transition: opacity 0.3s;
-    }
-    .scroll-to-top:hover { opacity: 1; }
     </style>
 """, unsafe_allow_html=True)
 
-# YUKARI ÇIK BUTONU (JS ENTEGRASYONU)
+# 3. JAVASCRIPT (YUKARI ÇIK BUTONU - PARENT WINDOW FIX)
 components.html("""
-<button onclick="window.scrollTo({top: 0, behavior: 'smooth'});" class="scroll-to-top" style="position:fixed; bottom:20px; left:20px; background:#FF4B4B; color:white; border:none; padding:10px 15px; border-radius:30px; font-size:16px; cursor:pointer; box-shadow: 2px 2px 10px rgba(0,0,0,0.3); z-index:9999;">
+<script>
+    function topaGit() {
+        // Iframe içinden ana pencereyi kaydır
+        window.parent.scrollTo({top: 0, behavior: 'smooth'});
+    }
+</script>
+<button onclick="topaGit()" style="
+    position: fixed; bottom: 20px; left: 20px;
+    background-color: #FF4B4B; color: white;
+    border: none; padding: 15px; border-radius: 50%;
+    font-size: 20px; cursor: pointer;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+    z-index: 999999; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px;">
     ⬆️
 </button>
 """, height=0)
@@ -193,10 +205,9 @@ def verileri_yukle():
 if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukle()
 
 # ==============================================================================
-# ⚡ HIZLI İŞLEMLER (LOCAL + THREAD)
+# ⚡ HIZLI İŞLEMLER
 # ==============================================================================
 def hizli_ekle(isim_veya_liste, tip, zaman="", mesaj="", durum="0"):
-    # ÇOKLU EKLEME (Virgül Algılama)
     if "," in isim_veya_liste:
         urunler = [u.strip() for u in isim_veya_liste.split(",")]
     else:
@@ -217,16 +228,11 @@ def hizli_sil(isim):
     threading.Thread(target=arka_planda_sil, args=(isim,)).start()
 
 def hizli_duzenle(eski_isim, yeni_isim):
-    # DÜZENLEME FIX
     if not yeni_isim or eski_isim == yeni_isim: return
-
-    # Local güncelle
     idx = st.session_state.local_df[st.session_state.local_df["Urun"] == eski_isim].index
     if not idx.empty:
         st.session_state.local_df.at[idx[0], "Urun"] = yeni_isim
         st.success(f"✅ '{eski_isim}' -> '{yeni_isim}' olarak değişti.")
-    
-    # Cloud güncelle
     threading.Thread(target=arka_planda_guncelle, args=(eski_isim, yeni_isim, None)).start()
 
 def hizli_durum_degistir(isim, yeni_durum):
@@ -252,7 +258,7 @@ def listeyi_temizle():
     st.rerun()
 
 # ==============================================================================
-# UI FONKSİYONLARI (CALLBACKLER)
+# UI CALLBACKLER
 # ==============================================================================
 def market_ekleme_callback():
     val = st.session_state.market_giris
@@ -355,10 +361,9 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# V51: DÜZENLEME VE LİSTELEME MODÜLÜ (MOBİL UYUMLU)
+# V52: DÜZENLEME VE LİSTELEME MODÜLÜ (YAN YANA GARANTİ)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
-    # DÜZENLEME MODU KONTROL
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
         with st.form(key=f"edit_form_{prefix}_{i}"):
             yeni_ad = st.text_input("Düzenle:", value=row['Urun'])
@@ -371,18 +376,15 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.session_state[f"editing_{prefix}"] = None
                 st.rerun()
     else:
-        # NORMAL GÖRÜNÜM (3 SÜTUN: İSİM | DÜZENLE | SİL)
-        # Mobilde bu oranlar yan yana kalmasını sağlar.
-        c1, c2, c3 = st.columns([0.70, 0.15, 0.15], gap="small", vertical_alignment="center")
+        # SÜTUN ORANLARI (Mobilde yan yana sığması için)
+        c1, c2, c3 = st.columns([0.65, 0.17, 0.18], gap="small", vertical_alignment="center")
         
         with c1:
             if checkbox_var:
-                # Checkbox işaretlenince durum değişir
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"):
                     hizli_durum_degistir(row['Urun'], "1")
                     st.rerun()
             else:
-                # Checkbox yoksa sadece isim yazar (Tamamlananlar listesi için)
                 st.markdown(f"**{row['Urun']}**")
 
         with c2:
@@ -391,7 +393,6 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.rerun()
 
         with c3:
-            # Silme butonu (Onay mekanizmalı)
             if not st.session_state.get(f"conf_{prefix}_{i}"):
                 if st.button("🗑️", key=f"del_{prefix}_{i}"): 
                     st.session_state[f"conf_{prefix}_{i}"] = True
@@ -403,8 +404,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                     st.rerun()
 
 def liste_satiri_geri_al(prefix, i, row):
-    # Tamamlananlar listesi için (Geri Al | Sil)
-    c1, c2, c3 = st.columns([0.70, 0.15, 0.15], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.65, 0.17, 0.18], gap="small", vertical_alignment="center")
     with c1:
         if st.button(f"➕ {row['Urun']}", key=f"back_{prefix}_{i}", use_container_width=True):
             hizli_durum_degistir(row['Urun'], "0")
