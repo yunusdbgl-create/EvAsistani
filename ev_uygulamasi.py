@@ -26,7 +26,7 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS (V54 - TAM EKRAN FIT MODU)
+# 🖼️ CSS (V55 - BETON MODU: ASLA AŞAĞI İNMEZ)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
@@ -37,53 +37,64 @@ st.markdown(f"""
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     </head>
     <style>
-    /* 1. ANA KAPLAYICIYI DARALT (Yanlardan taşmayı önler) */
+    /* 1. ANA KAPLAYICIYI DARALT */
     .block-container {{
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
         padding-top: 1rem !important;
         max-width: 100vw !important;
         overflow-x: hidden !important;
     }}
     
-    /* 2. TÜM SAYFAYI KİLİTLE (Yatay kaydırmayı yasakla) */
-    html, body, [data-testid="stAppViewContainer"] {{
-        overflow-x: hidden !important;
-        max-width: 100% !important;
-    }}
-    
-    /* 3. SÜTUNLARI YAN YANA ÇİVİLE */
+    /* 2. SATIR YAPISI (EN ÖNEMLİ KISIM) */
     div[data-testid="stHorizontalBlock"] {{
-        flex-wrap: nowrap !important;
-        gap: 0px !important; /* Aradaki boşluğu sıfırla */
+        display: flex !important;
+        flex-direction: row !important; /* Kesinlikle YAN YANA */
+        flex-wrap: nowrap !important;   /* Kesinlikle AŞAĞI İNME YOK */
         align-items: center !important;
+        width: 100% !important;
+        gap: 2px !important;
     }}
     
-    /* 4. SÜTUN İÇERİKLERİ */
+    /* 3. SÜTUN AYARLARI */
     div[data-testid="column"] {{
-        min-width: 0 !important;
-        padding: 0 2px !important; /* Sütun içi boşlukları azalt */
+        flex: 1 1 auto !important; /* Esnek ol */
+        min-width: 0px !important; /* Gerekirse 0px'e kadar küçül ama taşma */
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
     }}
     
-    /* 5. UZUN METİNLER (...) OLSUN */
-    div[data-testid="column"]:nth-of-type(1) p, 
-    div[data-testid="column"]:nth-of-type(1) div {{
+    /* 4. İSİM KISMI (Sol Sütun) */
+    div[data-testid="column"]:nth-of-type(1) div,
+    div[data-testid="column"]:nth-of-type(1) label,
+    div[data-testid="column"]:nth-of-type(1) p {{
         white-space: nowrap !important;
         overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        font-size: 14px !important; /* Telefonta yazı boyutu ideal olsun */
+        text-overflow: ellipsis !important; /* Sığmazsa ... koy */
+        font-size: 13px !important;
+        line-height: 38px !important; /* Butonla aynı hiza */
+        margin-bottom: 0 !important;
     }}
     
-    /* 6. BUTONLARI SIKIŞTIR */
+    /* 5. BUTON AYARLARI */
     button {{
         padding: 0 !important;
         margin: 0 !important;
         min-height: 38px !important;
         height: 38px !important;
+        line-height: 1 !important;
         width: 100% !important;
+        font-size: 16px !important;
+    }}
+    
+    /* Checkbox hizalaması */
+    .stCheckbox {{
+        margin-top: 0px !important;
+        padding-top: 0px !important;
     }}
 
-    /* KUTU TASARIMLARI (Aynı Kaldı) */
+    /* KUTU TASARIMLARI */
     .welcome-box {{
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; padding: 15px; border-radius: 12px;
@@ -303,7 +314,7 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# V54: LİSTELEME MODÜLÜ (MOBİL FIT)
+# V55: LİSTELEME MODÜLÜ (YAN YANA GARANTİLİ)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
@@ -313,8 +324,8 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
             if c_save.form_submit_button("💾 Kaydet"): hizli_duzenle(row['Urun'], yeni_ad); st.session_state[f"editing_{prefix}"] = None; st.rerun()
             if c_cancel.form_submit_button("❌ İptal"): st.session_state[f"editing_{prefix}"] = None; st.rerun()
     else:
-        # MOBİLDE SÜTUN PAYLAŞIMI: %65 İSİM - %18 DÜZENLE - %17 SİL
-        c1, c2, c3 = st.columns([0.65, 0.18, 0.17], gap="small", vertical_alignment="center")
+        # SÜTUN ORANLARI
+        c1, c2, c3 = st.columns([0.65, 0.17, 0.18], gap="small", vertical_alignment="center")
         with c1:
             if checkbox_var:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
@@ -328,7 +339,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"): hizli_sil(row['Urun']); st.session_state[f"conf_{prefix}_{i}"] = False; st.rerun()
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.65, 0.18, 0.17], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.65, 0.17, 0.18], gap="small", vertical_alignment="center")
     with c1:
         if st.button(f"➕ {row['Urun']}", key=f"back_{prefix}_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
     with c2:
