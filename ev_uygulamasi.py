@@ -85,7 +85,7 @@ class TuyaCloud:
         self.access_id = access_id
         self.access_secret = access_secret
         # Kesin olarak Amerikan sunucusu:
-        self.endpoint = "https://openapi.tuyaus.com"
+        self.endpoint = "https://openapi.tuyaeu.com"
 
     def _get_token(self):
         # Milisaniye cinsinden zaman damgası (Hata 1004'ü çözen kısım)
@@ -784,3 +784,4 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
 elif secim == "📂 Dosya": sayfa_dosya()
+
