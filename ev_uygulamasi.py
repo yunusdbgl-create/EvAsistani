@@ -76,77 +76,85 @@ def get_kategori_renk(kategori):
     return "#34495e"
 
 # ==============================================================================
-# TUYA BULUT BAĞLANTISI (V43 - CERRAHİ MÜDAHALE SÜRÜMÜ)
+# TUYA BULUT BAĞLANTISI (V45 - YENİ NESİL GÜVENLİK)
 # ==============================================================================
 class TuyaCloud:
     def __init__(self, access_id, access_secret):
         self.access_id = access_id
         self.access_secret = access_secret
-        # Denenecek Bölgeler (Sırasıyla: US, EU, US-West)
-        self.endpoints = [
-            "https://openapi.tuyaus.com",
-            "https://openapi.tuyaeu.com",
-            "https://openapi-we.tuyaus.com"
-        ]
-        self.active_endpoint = None
+        # Hata 1004 genelde bölge hatasıdır. 'cw' ile başlayan ID'ler genelde Avrupa'dır.
+        # Önce Avrupa'yı deniyoruz:
+        self.endpoint = "https://openapi.tuyaeu.com"
 
     def _get_timestamp(self):
-        # Saati Tuya ile eşitlemek için sistem saatini milisaniye olarak al
         return str(int(time.time() * 1000))
 
-    def _calculate_sign(self, t, access_token=None):
-        # 1004 Hatasının ilacı: Doğru İmza Algoritması
-        if access_token:
-            # Komut gönderirken: ClientID + Token + t
-            string_to_sign = self.access_id + access_token + t
+    def _calc_sign(self, t, access_token=None, method="GET", url="/v1.0/token", body_str=""):
+        # Tuya Standart İmza Algoritması (Bu algoritma 1004 hatasını çözer)
+        # 1. Body Hash
+        if not body_str:
+            payload_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # Empty SHA256
         else:
-            # Token alırken: ClientID + t
-            string_to_sign = self.access_id + t
-            
+            payload_hash = hashlib.sha256(body_str.encode('utf-8')).hexdigest().lower()
+
+        # 2. String to Sign
+        if access_token:
+            str_to_sign = self.access_id + access_token + t + method + "\n" + payload_hash + "\n" + "\n" + url
+        else:
+            str_to_sign = self.access_id + t + method + "\n" + payload_hash + "\n" + "\n" + url
+
+        # 3. HMAC-SHA256
         sign = hmac.new(
-            self.access_secret.encode('utf-8'), 
-            string_to_sign.encode('utf-8'), 
+            self.access_secret.encode('utf-8'),
+            str_to_sign.encode('utf-8'),
             hashlib.sha256
         ).hexdigest().upper()
+        
         return sign
 
     def _get_token(self):
         t = self._get_timestamp()
-        sign = self._calculate_sign(t)
-        headers = {'client_id': self.access_id, 'sign': sign, 't': t, 'sign_method': 'HMAC-SHA256'}
-
-        # Eğer çalışan sunucuyu zaten bulduysak direkt oraya git
-        if self.active_endpoint:
-            try:
-                r = requests.get(f"{self.active_endpoint}/v1.0/token?grant_type=1", headers=headers)
-                if r.json().get('success'): return r.json()['result']['access_token'], None
-            except: pass
-
-        # Bulmadıysak tara
-        for endpoint in self.endpoints:
-            try:
-                r = requests.get(f"{endpoint}/v1.0/token?grant_type=1", headers=headers)
-                res = r.json()
-                if res.get('success'):
-                    self.active_endpoint = endpoint # Kazanan sunucuyu kaydet
-                    return res['result']['access_token'], None
-            except Exception as e:
-                continue
+        # Token alırken Method: GET
+        sign = self._calc_sign(t, method="GET", url="/v1.0/token")
         
-        return None, "Hata 1004: Şifre doğru ama imza tutmuyor veya Data Center yanlış."
+        headers = {
+            'client_id': self.access_id,
+            'sign': sign,
+            't': t,
+            'sign_method': 'HMAC-SHA256',
+            'nonce': '',
+            'stringToSign': ''
+        }
+        
+        try:
+            # Token İsteği
+            response = requests.get(f"{self.endpoint}/v1.0/token?grant_type=1", headers=headers)
+            res = response.json()
+            
+            # Eğer 'Data Center' hatası verirse Amerika'ya dön
+            if res.get('code') == 1004 and "cross" in str(res.get('msg', '')).lower():
+                self.endpoint = "https://openapi.tuyaus.com"
+                return self._get_token() # Tekrar dene
+            
+            if res.get('success'):
+                return res['result']['access_token'], None
+            else:
+                return None, f"Hata: {res.get('code')} - {res.get('msg')}"
+        except Exception as e:
+            return None, str(e)
 
     def send_command(self, device_id, commands):
         token, error = self._get_token()
-        if not token: return False, f"Bağlantı Yok: {error}"
+        if not token: return False, f"Token Yok: {error}"
         
         t = self._get_timestamp()
         
-        # ⚠️ KRİTİK NOKTA: JSON FORMATI
-        # Tuya boşluk sevmez. separators=(',', ':') ile boşlukları siliyoruz.
+        # Body Formatı (Boşluksuz)
         payload_str = json.dumps({'commands': commands}, separators=(',', ':'))
+        url = f"/v1.0/devices/{device_id}/commands"
         
-        # Komut İmzası: ClientID + Token + t (Simple Mode)
-        sign = self._calculate_sign(t, token)
+        # Komut İmzası (POST ve Body Hash içerir)
+        sign = self._calc_sign(t, access_token=token, method="POST", url=url, body_str=payload_str)
 
         headers = {
             'client_id': self.access_id,
@@ -158,9 +166,8 @@ class TuyaCloud:
         }
         
         try:
-            # Data'yı string olarak gönderiyoruz ki requests kütüphanesi araya boşluk eklemesin
             response = requests.post(
-                f"{self.active_endpoint}/v1.0/devices/{device_id}/commands", 
+                f"{self.endpoint}{url}", 
                 headers=headers, 
                 data=payload_str
             )
@@ -169,7 +176,7 @@ class TuyaCloud:
             else: return False, f"Tuya Hatası: {res.get('code')} - {res.get('msg')}"
         except Exception as e: return False, str(e)
 
-# Nesneyi Başlat
+# Tuya Başlat
 tuya = TuyaCloud(TUYA_ACCESS_ID, TUYA_ACCESS_SECRET)
 
 def mama_ver(device_id, porsiyon=1):
@@ -190,7 +197,7 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
     tum_malzemeler = set()
     for urun in marketten_gelenler: tum_malzemeler.add(urun.lower().split("(")[0].strip())
     for urun in manuel_eklenenler: tum_malzemeler.add(urun.lower())
-    tarifler = {"Menemen": ["yumurta", "domates", "biber"], "Omlet": ["yumurta", "peynir", "tereyağı"], "Makarna": ["makarna", "salça", "yağ"], "Köfte": ["kıyma", "soğan", "ekmek"]}
+    tarifler = {"Menemen": ["yumurta", "domates", "biber"], "Omlet": ["yumurta", "peynir", "tereyağı"], "Makarna": ["makarna", "salça", "yağ"], "Köfte": ["kıyma", "soğan", "ekmek"], "Kısır": ["bulgur", "salça", "yeşillik"]}
     tam, eksik = [], []
     for yemek, malzemeler in tarifler.items():
         eksikler = [m for m in malzemeler if m not in tum_malzemeler]
@@ -198,15 +205,15 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
         elif len(eksikler) <= 2: eksik.append((yemek, eksikler))
     return tam, eksik, list(tum_malzemeler)
 
-# ==============================================================================
-# KARŞILAMA VE GSPREAD
-# ==============================================================================
 def karsilama_paneli():
     if random.random() < 0.20:
         st.markdown(f'<div class="prenses-box"><div class="welcome-title">🐾 MİYAV!</div><div class="welcome-note">{random.choice(prenses_sozleri())}</div></div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="welcome-box"><div class="welcome-title">Hoşgeldin Hocam! ☀️</div></div>', unsafe_allow_html=True)
 
+# ==============================================================================
+# GSPREAD VE HIZLI İŞLEMLER
+# ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = Credentials.from_service_account_info(dict(st.secrets["connections"]["gsheets"]), scopes=scopes)
@@ -261,9 +268,6 @@ def verileri_yukle():
 
 if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukle()
 
-# ==============================================================================
-# HIZLI İŞLEMLER
-# ==============================================================================
 def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
     if tip in ["MARKET", "YEMEK_OGUN", "YEMEK_KAHVALTI"]:
         mevcut = st.session_state.local_df[(st.session_state.local_df["Tip"] == tip) & (st.session_state.local_df["Urun"] == isim)]
@@ -302,7 +306,7 @@ def cihaz_komut_logla(cihaz_adi, islem):
     st.toast(f"📡 {cihaz_adi}: {islem}")
     hizli_ekle(f"{cihaz_adi}: {islem}", "DEVICE_LOG", zaman=datetime.now().strftime("%d-%m %H:%M"))
 
-# CALLBACKLER
+# Callback Fonksiyonları
 def market_ekleme_callback():
     val = st.session_state.market_giris
     kat_secim = st.session_state.market_kategori_secim
@@ -311,7 +315,6 @@ def market_ekleme_callback():
     if val:
         hizli_ekle(val, "MARKET", mesaj=kategori)
         st.session_state.market_giris = ""
-        if "market_kategori_yeni" in st.session_state: st.session_state.market_kategori_yeni = ""
 
 def is_ekleme_callback():
     val = st.session_state.is_giris
@@ -321,7 +324,6 @@ def is_ekleme_callback():
     if val:
         hizli_ekle(val, "TODO", mesaj=kategori)
         st.session_state.is_giris = ""
-        if "is_kategori_yeni" in st.session_state: st.session_state.is_kategori_yeni = ""
 
 def yemek_ekle_callback(input_key, tip_kod):
     val = st.session_state[input_key]
@@ -330,10 +332,6 @@ def yemek_ekle_callback(input_key, tip_kod):
 def rutin_ekle_callback():
     val = st.session_state.rutin_giris
     if val: hizli_ekle(val, "RUTIN", durum="0"); st.session_state.rutin_giris = ""
-
-def ekleme_callback(key, tip):
-    val = st.session_state[key]
-    if val: hizli_ekle(val, tip); st.session_state[key] = ""
 
 def not_callback():
     baslik, icerik = st.session_state.not_baslik, st.session_state.not_icerik
@@ -374,11 +372,10 @@ def silme_butonu_koy(prefix, urun):
         st.caption("İptal")
 
 # ==============================================================================
-# DASHBOARD
+# SAYFALAR
 # ==============================================================================
 def dashboard_goster():
     df = st.session_state.local_df
-    # Sıradaki Fatura
     df_f = df[df["Tip"] == "FATURA"]
     siradaki_fatura = "Yok"; kalan_gun_txt = ""
     if not df_f.empty:
@@ -397,9 +394,6 @@ def dashboard_goster():
     c2.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
     st.markdown("---")
 
-# ==============================================================================
-# SAYFALAR
-# ==============================================================================
 def sayfa_ana_ekran():
     if st.button("🎁 Bana Bir Sürpriz Yap", type="primary", use_container_width=True):
         st.balloons(); soz = random.choice(ask_kavanozu_sozleri()); st.success(f"💌 {soz}"); time.sleep(3)
@@ -681,12 +675,8 @@ def sayfa_dosya():
     if dosya:
         import img2pdf; st.download_button("⬇️ İndir", img2pdf.convert(dosya.read()), f"{dosya.name}.pdf", "application/pdf")
 
-# ==============================================================================
-# YENİ MENÜ: CİHAZLAR (V43 - TUYA ENTEGRASYON)
-# ==============================================================================
 def sayfa_cihazlar():
-    st.markdown("### 🎮 Akıllı Ev Kontrol (V43 - Cerrahi Mod)")
-    
+    st.markdown("### 🎮 Akıllı Ev Kontrol Merkezi (Tuya Cloud - Standard Mode)")
     with st.expander("🍲 Mama Kabı 1 (Prenses)", expanded=True):
         c1, c2 = st.columns(2)
         with c1: st.markdown('<div class="device-card">🟢 <b>Durum: Çevrimiçi</b></div>', unsafe_allow_html=True)
@@ -696,17 +686,15 @@ def sayfa_cihazlar():
                     basari, msg = mama_ver(MAMA_KABI_1_ID, 1)
                     if basari:
                         st.success("✅ Mama verildi!")
-                        cihaz_komut_logla("Mama Kabı 1", "1 Porsiyon")
+                        cihaz_komut_logla("Mama Kabı 1", "1 Porsiyon Verildi")
                     else: st.error(f"❌ {msg}")
-            
             if st.button("🦴🦴 3 Porsiyon Ver (No.1)", use_container_width=True):
                  with st.spinner("📡 Buluta bağlanılıyor..."):
                     basari, msg = mama_ver(MAMA_KABI_1_ID, 3)
                     if basari: 
                         st.success("✅ 3 Porsiyon verildi!")
-                        cihaz_komut_logla("Mama Kabı 1", "3 Porsiyon")
+                        cihaz_komut_logla("Mama Kabı 1", "3 Porsiyon Verildi")
                     else: st.error(f"❌ {msg}")
-
     with st.expander("🍲 Mama Kabı 2 (Yedek)", expanded=True):
         c1, c2 = st.columns(2)
         with c1: st.markdown('<div class="device-card">🟢 <b>Durum: Çevrimiçi</b></div>', unsafe_allow_html=True)
@@ -716,9 +704,8 @@ def sayfa_cihazlar():
                     basari, msg = mama_ver(MAMA_KABI_2_ID, 1)
                     if basari:
                         st.success("✅ Mama verildi!")
-                        cihaz_komut_logla("Mama Kabı 2", "1 Porsiyon")
+                        cihaz_komut_logla("Mama Kabı 2", "1 Porsiyon Verildi")
                     else: st.error(f"❌ {msg}")
-    
     st.divider()
     with st.expander("📜 Cihaz Günlüğü"):
         df_log = st.session_state.local_df[st.session_state.local_df["Tip"] == "DEVICE_LOG"]
