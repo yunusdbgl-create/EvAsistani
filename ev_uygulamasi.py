@@ -22,8 +22,8 @@ except ImportError:
 # 🔐 GİZLİ TUYA VE AYARLAR (BURAYI SİTEDEN KONTROL ET VE YENİLE)
 # ==============================================================================
 # Lütfen Access Secret'ı siteden tekrar kopyalayıp buraya yapıştır.
-TUYA_ACCESS_ID = "d3xnudf48p7knkadqe35".strip() 
-TUYA_ACCESS_SECRET = "cf5adc62eccc41a8b18d65a4dcd51821".strip() 
+TUYA_ACCESS_ID = "cwff7scadkxgkfkxncvh".strip() 
+TUYA_ACCESS_SECRET = "6a3d91a6935a4120a68e96d59957cc46".strip() 
 
 # Cihaz ID'leri
 MAMA_KABI_1_ID = "eb3ebfbf640898596ea4yk".strip()
@@ -802,3 +802,4 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
 elif secim == "📂 Dosya": sayfa_dosya()
+
