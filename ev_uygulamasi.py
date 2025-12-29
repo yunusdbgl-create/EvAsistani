@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, time as dt_time
 import threading
 import random
 
-# Grafik kütüphanesini güvenli içe aktarma
+# Grafik kütüphanesi kontrolü
 try:
     import plotly.express as px
     GRAFIK_VAR = True
@@ -19,14 +19,12 @@ except ImportError:
     GRAFIK_VAR = False
 
 # ==============================================================================
-# 🔐 GİZLİ TUYA VE AYARLAR (YENİ ŞİFRELERİN GÖMÜLDÜ)
+# 🔐 GİZLİ TUYA VE AYARLAR (YENİ ŞİFRELERİN GÖMÜLÜ)
 # ==============================================================================
-# Yeni proje (Western America) şifrelerin:
 TUYA_ACCESS_ID = "cwff7scadkxgkfkxncvh"
 TUYA_ACCESS_SECRET = "6a3d91a6935a4120a68e96d59957cc46"
 
-# Cihaz ID'leri (Eğer yeni projede cihazları tekrar eklediysen bunlar değişmiş olabilir)
-# Eski ID'ler burada duruyor. Hata alırsan yeni projedeki "All Devices" kısmından ID'leri kontrol et.
+# Cihaz ID'leri
 MAMA_KABI_1_ID = "eb3ebfbf640898596ea4yk"
 MAMA_KABI_2_ID = "eba49fe3029896e87drx10"
 
@@ -78,57 +76,100 @@ def get_kategori_renk(kategori):
     return "#34495e"
 
 # ==============================================================================
-# TUYA BULUT BAĞLANTISI (V41 GÜNCELLEMESİ - AMERİKA & SAAT AYARI)
+# TUYA BULUT BAĞLANTISI (V43 - CERRAHİ MÜDAHALE SÜRÜMÜ)
 # ==============================================================================
 class TuyaCloud:
     def __init__(self, access_id, access_secret):
         self.access_id = access_id
         self.access_secret = access_secret
-        # Kesin olarak Amerikan sunucusu:
-        self.endpoint = "https://openapi.tuyaeu.com"
+        # Denenecek Bölgeler (Sırasıyla: US, EU, US-West)
+        self.endpoints = [
+            "https://openapi.tuyaus.com",
+            "https://openapi.tuyaeu.com",
+            "https://openapi-we.tuyaus.com"
+        ]
+        self.active_endpoint = None
+
+    def _get_timestamp(self):
+        # Saati Tuya ile eşitlemek için sistem saatini milisaniye olarak al
+        return str(int(time.time() * 1000))
+
+    def _calculate_sign(self, t, access_token=None):
+        # 1004 Hatasının ilacı: Doğru İmza Algoritması
+        if access_token:
+            # Komut gönderirken: ClientID + Token + t
+            string_to_sign = self.access_id + access_token + t
+        else:
+            # Token alırken: ClientID + t
+            string_to_sign = self.access_id + t
+            
+        sign = hmac.new(
+            self.access_secret.encode('utf-8'), 
+            string_to_sign.encode('utf-8'), 
+            hashlib.sha256
+        ).hexdigest().upper()
+        return sign
 
     def _get_token(self):
-        # Milisaniye cinsinden zaman damgası (Hata 1004'ü çözen kısım)
-        t = str(int(time.time() * 1000))
-        
-        # Token İmzası
-        sign_str = "GET\n" + self.access_id + t # Bazı projeler bunu ister # (Not: Eğer bu hata verirse eski haline döndürürsün)
-        sign = hmac.new(self.access_secret.encode('utf-8'), sign_str.encode('utf-8'), hashlib.sha256).hexdigest().upper()
-        
+        t = self._get_timestamp()
+        sign = self._calculate_sign(t)
         headers = {'client_id': self.access_id, 'sign': sign, 't': t, 'sign_method': 'HMAC-SHA256'}
-        try:
-            response = requests.get(f"{self.endpoint}/v1.0/token?grant_type=1", headers=headers)
-            res = response.json()
-            if res.get('success'):
-                return res['result']['access_token'], None
-            else:
-                return None, f"Hata: {res.get('code')} - {res.get('msg')}"
-        except Exception as e:
-            return None, str(e)
+
+        # Eğer çalışan sunucuyu zaten bulduysak direkt oraya git
+        if self.active_endpoint:
+            try:
+                r = requests.get(f"{self.active_endpoint}/v1.0/token?grant_type=1", headers=headers)
+                if r.json().get('success'): return r.json()['result']['access_token'], None
+            except: pass
+
+        # Bulmadıysak tara
+        for endpoint in self.endpoints:
+            try:
+                r = requests.get(f"{endpoint}/v1.0/token?grant_type=1", headers=headers)
+                res = r.json()
+                if res.get('success'):
+                    self.active_endpoint = endpoint # Kazanan sunucuyu kaydet
+                    return res['result']['access_token'], None
+            except Exception as e:
+                continue
+        
+        return None, "Hata 1004: Şifre doğru ama imza tutmuyor veya Data Center yanlış."
 
     def send_command(self, device_id, commands):
         token, error = self._get_token()
-        if not token: 
-            return False, f"Bağlantı Kurulamadı: {error}"
+        if not token: return False, f"Bağlantı Yok: {error}"
         
-        t = str(int(time.time() * 1000))
-        # Komut İmzası
-        string_to_sign = self.access_id + token + t + f"POST\n\n\n\n/v1.0/devices/{device_id}/commands"
-        sign = hmac.new(self.access_secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest().upper()
+        t = self._get_timestamp()
+        
+        # ⚠️ KRİTİK NOKTA: JSON FORMATI
+        # Tuya boşluk sevmez. separators=(',', ':') ile boşlukları siliyoruz.
+        payload_str = json.dumps({'commands': commands}, separators=(',', ':'))
+        
+        # Komut İmzası: ClientID + Token + t (Simple Mode)
+        sign = self._calculate_sign(t, token)
 
         headers = {
-            'client_id': self.access_id, 'access_token': token, 'sign': sign, 't': t,
-            'sign_method': 'HMAC-SHA256', 'Content-Type': 'application/json'
+            'client_id': self.access_id,
+            'access_token': token,
+            'sign': sign,
+            't': t,
+            'sign_method': 'HMAC-SHA256',
+            'Content-Type': 'application/json'
         }
-        payload = {'commands': commands}
+        
         try:
-            response = requests.post(f"{self.endpoint}/v1.0/devices/{device_id}/commands", headers=headers, data=json.dumps(payload))
+            # Data'yı string olarak gönderiyoruz ki requests kütüphanesi araya boşluk eklemesin
+            response = requests.post(
+                f"{self.active_endpoint}/v1.0/devices/{device_id}/commands", 
+                headers=headers, 
+                data=payload_str
+            )
             res = response.json()
             if res.get('success'): return True, "Başarılı"
             else: return False, f"Tuya Hatası: {res.get('code')} - {res.get('msg')}"
         except Exception as e: return False, str(e)
 
-# Tuya Nesnesi
+# Nesneyi Başlat
 tuya = TuyaCloud(TUYA_ACCESS_ID, TUYA_ACCESS_SECRET)
 
 def mama_ver(device_id, porsiyon=1):
@@ -140,47 +181,16 @@ def mama_ver(device_id, porsiyon=1):
 # SÜRPRİZ VE PRENSES VERİTABANI
 # ==============================================================================
 def ask_kavanozu_sozleri():
-    return [
-        "Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", 
-        "Akşam çayı benden!", "Senin gülüşün güneşten daha parlak.", "Dünyanın en şanslı adamı benim.",
-        "Bir kahve molası verelim mi?", "Seni seviyorum, hem de çok!", "Bugün senin günün olsun.",
-        "Akşama en sevdiğin filmi izleyelim.", "Harika bir eşsin.", "Evin neşesi sensin."
-    ]
+    return ["Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", "Akşam çayı benden!", "Harika bir eşsin.", "Evin neşesi sensin."]
 
 def prenses_sozleri():
-    return [
-        "🐈 Prenses: Mama kabım boşken bu uygulamada ne geziyorsun?",
-        "🐈 Prenses: Yunus'a söyle, o koltuk benim.",
-        "🐈 Prenses: Beni sevmeyi unuttunuz mu?",
-        "🐈 Prenses: Akşama balık mı var? Bana da ayırın.",
-        "🐈 Prenses: Miyav! (Tercümesi: Beni sevin!)"
-    ]
+    return ["🐈 Prenses: Mama kabım boşken bu uygulamada ne geziyorsun?", "🐈 Prenses: Yunus'a söyle, o koltuk benim.", "🐈 Prenses: Miyav! (Tercümesi: Beni sevin!)"]
 
-# ==============================================================================
-# AI MUTFAK ŞEFİ MOTORU
-# ==============================================================================
 def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
     tum_malzemeler = set()
     for urun in marketten_gelenler: tum_malzemeler.add(urun.lower().split("(")[0].strip())
     for urun in manuel_eklenenler: tum_malzemeler.add(urun.lower())
-
-    tarifler = {
-        "Menemen": ["yumurta", "domates", "biber"],
-        "Omlet": ["yumurta", "peynir", "tereyağı"],
-        "Mercimek Çorbası": ["mercimek", "soğan", "salça", "yağ"],
-        "Karnıyarık": ["patlıcan", "kıyma", "domates", "soğan"],
-        "Köfte Patates": ["kıyma", "patates", "soğan", "ekmek"],
-        "Makarna": ["makarna", "salça", "yağ"],
-        "Tavuk Sote": ["tavuk", "biber", "domates", "soğan"],
-        "Kısır": ["bulgur", "salça", "yeşillik", "limon"],
-        "Cacık": ["yoğurt", "salatalık", "sarımsak"],
-        "Pilav": ["pirinç", "tereyağı", "şehriye"],
-        "Patates Kızartması": ["patates", "yağ"],
-        "Çoban Salata": ["domates", "salatalık", "biber", "soğan"],
-        "Mantarlı Tavuk": ["tavuk", "mantar", "krema"],
-        "Hamburger": ["kıyma", "ekmek", "domates", "yeşillik"]
-    }
-    
+    tarifler = {"Menemen": ["yumurta", "domates", "biber"], "Omlet": ["yumurta", "peynir", "tereyağı"], "Makarna": ["makarna", "salça", "yağ"], "Köfte": ["kıyma", "soğan", "ekmek"]}
     tam, eksik = [], []
     for yemek, malzemeler in tarifler.items():
         eksikler = [m for m in malzemeler if m not in tum_malzemeler]
@@ -189,21 +199,14 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
     return tam, eksik, list(tum_malzemeler)
 
 # ==============================================================================
-# KARŞILAMA (PRENSES MODLU)
+# KARŞILAMA VE GSPREAD
 # ==============================================================================
 def karsilama_paneli():
     if random.random() < 0.20:
-        soz = random.choice(prenses_sozleri())
-        st.markdown(f'<div class="prenses-box"><div class="welcome-title">🐾 MİYAV!</div><div class="welcome-note">{soz}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="prenses-box"><div class="welcome-title">🐾 MİYAV!</div><div class="welcome-note">{random.choice(prenses_sozleri())}</div></div>', unsafe_allow_html=True)
     else:
-        saat = datetime.now().hour
-        selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
-        sozler = ["🏡 Evimiz kalemizdir.", "💡 Yemekler artık kendi menüsünde!", "❤️ Bugün harika bir gün olacak.", "👨‍🍳 Şef de emrinizde, Çark da!"]
-        st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="welcome-box"><div class="welcome-title">Hoşgeldin Hocam! ☀️</div></div>', unsafe_allow_html=True)
 
-# ==============================================================================
-# ARKA PLAN VE VERİTABANI
-# ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = Credentials.from_service_account_info(dict(st.secrets["connections"]["gsheets"]), scopes=scopes)
@@ -265,7 +268,6 @@ def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
     if tip in ["MARKET", "YEMEK_OGUN", "YEMEK_KAHVALTI"]:
         mevcut = st.session_state.local_df[(st.session_state.local_df["Tip"] == tip) & (st.session_state.local_df["Urun"] == isim)]
         if not mevcut.empty: return
-
     row = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
     st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([row])], ignore_index=True)
     threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],)).start()
@@ -372,11 +374,10 @@ def silme_butonu_koy(prefix, urun):
         st.caption("İptal")
 
 # ==============================================================================
-# DASHBOARD (EVİN NABZI) - GİZLİLİK MODU
+# DASHBOARD
 # ==============================================================================
 def dashboard_goster():
     df = st.session_state.local_df
-    
     # Sıradaki Fatura
     df_f = df[df["Tip"] == "FATURA"]
     siradaki_fatura = "Yok"; kalan_gun_txt = ""
@@ -390,10 +391,7 @@ def dashboard_goster():
                 siradaki_fatura = row["Urun"]
                 kalan_gun_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
                 break
-    
-    # Market Sepeti
     sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
-
     c1, c2 = st.columns(2)
     c1.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
     c2.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
@@ -407,32 +405,26 @@ def sayfa_ana_ekran():
         st.balloons(); soz = random.choice(ask_kavanozu_sozleri()); st.success(f"💌 {soz}"); time.sleep(3)
 
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
-    
     with tab1:
         df = st.session_state.local_df
         df_market = df[df["Tip"] == "MARKET"]
         VARSAYILAN_KATEGORILER = ["🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt & Kahvaltılık", "🍞 Gıda & Bakliyat", "🧹 Temizlik", "🍫 Atıştırmalık"]
         kayitli_kategoriler = {k for k in set(df_market["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]}
         TUM_KATEGORILER = sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler)) + ["✏️ Yeni Kategori Yaz"]
-        
         c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
         with c2: st.selectbox("Kategori", TUM_KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
         with c3: st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
         if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz": st.text_input("Yeni Kategori Adı:", key="market_kategori_yeni")
         st.markdown("---")
-        
         alinacaklar = df_market[df_market["Durum"] == "0"]
         st.subheader("📌 Alınacaklar Listesi")
         if alinacaklar.empty: st.success("Sepet Boş! 🎉")
-        
         kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
         if "Genel" in kategori_listesi: kategori_listesi.remove("Genel"); kategori_listesi.append("Genel")
-
         for kat in kategori_listesi:
             if kat == "Genel": items = alinacaklar[(alinacaklar["Mesaj"] == "") | (alinacaklar["Mesaj"] == "Genel") | (alinacaklar["Mesaj"] == "None")]
             else: items = alinacaklar[alinacaklar["Mesaj"] == kat]
-            
             if not items.empty:
                 renk = get_kategori_renk(kat)
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
@@ -442,7 +434,6 @@ def sayfa_ana_ekran():
                         with c1:
                             if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
                         with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
-
         st.divider()
         tamamlananlar = df_market[df_market["Durum"] == "1"]
         with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
@@ -457,7 +448,6 @@ def sayfa_ana_ekran():
                                 with c1:
                                     if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
                                 with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
-
     with tab2:
         df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
         VARSAYILAN_IS = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba"]
@@ -484,7 +474,6 @@ def sayfa_ana_ekran():
                         with c1:
                             if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
                         with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
-
     with tab3:
         with st.form("alarm"):
             mesaj = st.text_input("Not", placeholder="Fırın...")
@@ -525,7 +514,6 @@ def sayfa_ekonomi():
                     with c3: silme_butonu_koy(f"fat_{i}", row['Urun'])
                     st.divider()
                 except: pass
-
     with tab2:
         with st.expander("➕ Gelir/Gider", expanded=True):
             c1, c2 = st.columns(2)
@@ -546,14 +534,12 @@ def sayfa_ekonomi():
                 with c1: st.write(f"{'🟢' if row['Durum']=='Gelir' else '🔴'} **{row['Urun']}**")
                 with c2: st.write(f"{row['Mesaj']} ₺")
                 with c3: silme_butonu_koy(f"b_{i}", row['Urun'])
-
     with tab3:
         with st.expander("➕ Varlık Ekle", expanded=True):
             c1, c2 = st.columns(2)
             with c1: st.text_input("Varlık", key="yat_ad"); st.number_input("Değer", step=100.0, key="yat_mik")
             with c2: st.text_area("Not", height=100, key="yat_not"); st.button("KAYDET", key="btn_yat_save", on_click=yatirim_callback, use_container_width=True)
         df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]
-        
         if GRAFIK_VAR and not df_y.empty:
             df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if x.replace('.','',1).isdigit() else 0)
             toplam = df_y["Tutar"].sum()
@@ -567,7 +553,6 @@ def sayfa_ekonomi():
         elif not df_y.empty:
             toplam = sum(float(r["Mesaj"]) for _, r in df_y.iterrows() if r["Mesaj"].replace('.','',1).isdigit())
             st.metric("💰 TOPLAM", f"{toplam:,.0f} ₺")
-
         st.divider()
         for i, row in df_y.iterrows():
             c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="center")
@@ -576,21 +561,17 @@ def sayfa_ekonomi():
 
 def sayfa_yemekler():
     tab1, tab2, tab3, tab4 = st.tabs(["🔥 EŞLEŞME", "🎡 KAHVALTI", "🎡 YEMEK", "👨‍🍳 AI ŞEF"])
-    
     with st.expander("⚙️ Temizlik"):
         if st.button("🧹 Çift Kayıtları Temizle", use_container_width=True): listeyi_temizle()
-
     with tab1:
         st.caption("Tinder usulü yemek seçimi! Kararsız kaldığınızda kullanın.")
         df_oyun = st.session_state.local_df[(st.session_state.local_df["Tip"].isin(["YEMEK_OGUN", "YEMEK_KAHVALTI"])) & (st.session_state.local_df["Durum"] == "1")]
         yemek_listesi = df_oyun["Urun"].tolist()
-        
         if not yemek_listesi:
             st.warning("Önce Çark kısmından yemek ekleyin!")
         else:
             if 'oyun_yemegi' not in st.session_state:
                 st.session_state.oyun_yemegi = random.choice(yemek_listesi)
-            
             st.markdown(f"<h2 style='text-align: center;'>🍽️ {st.session_state.oyun_yemegi} 🍽️</h2>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             if c1.button("👎 Olmaz", use_container_width=True):
@@ -599,7 +580,6 @@ def sayfa_yemekler():
             if c2.button("👍 Olur", type="primary", use_container_width=True):
                 st.balloons()
                 st.success(f"HARİKA! Akşama {st.session_state.oyun_yemegi} var! Afiyet olsun.")
-
     with tab2:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Kahvaltı Ekle", key="kahvalti_giris", label_visibility="collapsed")
@@ -619,7 +599,6 @@ def sayfa_yemekler():
                 else:
                     if chk: hizli_durum_degistir(row['Urun'], "0")
             with c2: silme_butonu_koy(f"k_del_{i}", row['Urun'])
-
     with tab3:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Yemek Ekle", key="yemek_giris", label_visibility="collapsed")
@@ -639,7 +618,6 @@ def sayfa_yemekler():
                 else:
                     if chk: hizli_durum_degistir(row['Urun'], "0")
             with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
-
     with tab4:
         st.subheader("👨‍🍳 AI Mutfak Şefi")
         df = st.session_state.local_df
@@ -657,7 +635,6 @@ def sayfa_yemekler():
 
 def sayfa_yasam():
     tab1, tab2, tab3 = st.tabs(["⛓️ ZİNCİR", "⏳ SAYAÇ", "📒 NOTLAR"])
-
     with tab1:
         st.caption("Günlük hedeflerini tamamla, zinciri kırma!")
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
@@ -676,7 +653,6 @@ def sayfa_yasam():
                 else:
                     if is_done: hizli_durum_degistir(row['Urun'], "0"); st.rerun()
             with c2: silme_butonu_koy(f"r_del_{i}", row['Urun'])
-
     with tab2:
         with st.expander("➕ Yeni Sayaç", expanded=True):
             st.text_input("Etkinlik", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih")
@@ -692,7 +668,6 @@ def sayfa_yasam():
                     with c2: silme_butonu_koy(f"syc_{i}", row['Urun'])
                     st.divider()
                 except: pass
-
     with tab3:
         with st.expander("➕ Not Ekle", expanded=True):
             st.text_input("Başlık", key="not_baslik"); st.text_area("İçerik", key="not_icerik"); st.button("KAYDET", key="btn_not_save", on_click=not_callback)
@@ -707,12 +682,11 @@ def sayfa_dosya():
         import img2pdf; st.download_button("⬇️ İndir", img2pdf.convert(dosya.read()), f"{dosya.name}.pdf", "application/pdf")
 
 # ==============================================================================
-# YENİ MENÜ: CİHAZLAR (Tuya Cloud - Gerçek Kontrol)
+# YENİ MENÜ: CİHAZLAR (V43 - TUYA ENTEGRASYON)
 # ==============================================================================
 def sayfa_cihazlar():
-    st.markdown("### 🎮 Akıllı Ev Kontrol Merkezi (Tuya Cloud - US)")
+    st.markdown("### 🎮 Akıllı Ev Kontrol (V43 - Cerrahi Mod)")
     
-    # MAMA KABI 1 (PRENSES)
     with st.expander("🍲 Mama Kabı 1 (Prenses)", expanded=True):
         c1, c2 = st.columns(2)
         with c1: st.markdown('<div class="device-card">🟢 <b>Durum: Çevrimiçi</b></div>', unsafe_allow_html=True)
@@ -722,18 +696,17 @@ def sayfa_cihazlar():
                     basari, msg = mama_ver(MAMA_KABI_1_ID, 1)
                     if basari:
                         st.success("✅ Mama verildi!")
-                        cihaz_komut_logla("Mama Kabı 1", "1 Porsiyon Verildi")
+                        cihaz_komut_logla("Mama Kabı 1", "1 Porsiyon")
                     else: st.error(f"❌ {msg}")
-
+            
             if st.button("🦴🦴 3 Porsiyon Ver (No.1)", use_container_width=True):
                  with st.spinner("📡 Buluta bağlanılıyor..."):
                     basari, msg = mama_ver(MAMA_KABI_1_ID, 3)
                     if basari: 
                         st.success("✅ 3 Porsiyon verildi!")
-                        cihaz_komut_logla("Mama Kabı 1", "3 Porsiyon Verildi")
+                        cihaz_komut_logla("Mama Kabı 1", "3 Porsiyon")
                     else: st.error(f"❌ {msg}")
 
-    # MAMA KABI 2 (YEDEK)
     with st.expander("🍲 Mama Kabı 2 (Yedek)", expanded=True):
         c1, c2 = st.columns(2)
         with c1: st.markdown('<div class="device-card">🟢 <b>Durum: Çevrimiçi</b></div>', unsafe_allow_html=True)
@@ -743,21 +716,9 @@ def sayfa_cihazlar():
                     basari, msg = mama_ver(MAMA_KABI_2_ID, 1)
                     if basari:
                         st.success("✅ Mama verildi!")
-                        cihaz_komut_logla("Mama Kabı 2", "1 Porsiyon Verildi")
+                        cihaz_komut_logla("Mama Kabı 2", "1 Porsiyon")
                     else: st.error(f"❌ {msg}")
     
-    # ROBOT SÜPÜRGE (Şimdilik Simülasyon)
-    st.divider()
-    st.markdown("### 🧹 Robot Süpürge (X20 Pro)")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown('<div class="device-card">🤖 <b>Xiaomi Robot</b><br><span style="color:orange; font-size:12px;">● Beklemede (Sim)</span></div>', unsafe_allow_html=True)
-    with c2:
-        if st.button("▶️ Tüm Evi Temizle", use_container_width=True):
-            cihaz_komut_logla("Robot", "Tüm Ev Temizliği Başlatıldı (Sim)")
-        if st.button("🐈 Prenses Kumu Döküldü!", type="primary", use_container_width=True):
-            cihaz_komut_logla("Robot", "Bölgesel Temizlik (Sim)")
-
     st.divider()
     with st.expander("📜 Cihaz Günlüğü"):
         df_log = st.session_state.local_df[st.session_state.local_df["Tip"] == "DEVICE_LOG"]
@@ -784,6 +745,3 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
 elif secim == "📂 Dosya": sayfa_dosya()
-
-
-
