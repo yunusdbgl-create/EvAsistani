@@ -387,45 +387,28 @@ def dashboard_goster():
 # LİSTELEME MODÜLÜ (SIFIR BOŞLUK)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
-    if st.session_state.get(f"editing_{prefix}") == row['Urun']:
-        with st.form(key=f"edit_form_{prefix}_{i}"):
-            yeni = st.text_input("Dzn:", value=row['Urun'])
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("💾"): 
-                hizli_duzenle(row['Urun'], yeni)
-                st.session_state[f"editing_{prefix}"] = None
-                st.rerun()
-            if c2.form_submit_button("❌"): 
-                st.session_state[f"editing_{prefix}"] = None
-                st.rerun()
-    else:
-        # Oranları 1-1-20 veriyoruz ki Streamlit metne maksimum alan ayırsın.
-        # CSS (yukarıdaki kod) butonları 35px'e zorla küçültecek.
-        c1, c2, c3 = st.columns([1, 1, 20], gap="small", vertical_alignment="center")
-        
-        with c1:
-            if st.button("✏️", key=f"ed_{prefix}_{i}"):
-                st.session_state[f"editing_{prefix}"] = row['Urun']
-                st.rerun()
+    key_edit = f"{prefix}_edit_{i}"
+    key_del = f"{prefix}_del_{i}"
 
-        with c2:
-            if not st.session_state.get(f"conf_{prefix}_{i}"):
-                if st.button("🗑️", key=f"del_{prefix}_{i}"): 
-                    st.session_state[f"conf_{prefix}_{i}"] = True
-                    st.rerun()
-            else:
-                if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"):
-                    hizli_sil(row['Urun'])
-                    st.session_state[f"conf_{prefix}_{i}"] = False
-                    st.rerun()
+    st.markdown(
+        f"""
+        <div class="row-line">
+            <button onclick="Streamlit.setComponentValue('{key_edit}', '1')">✏️</button>
+            <button onclick="Streamlit.setComponentValue('{key_del}', '1')">🗑️</button>
+            <div class="row-text">{row['Urun']}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        with c3:
-            if checkbox_var:
-                if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"):
-                    hizli_durum_degistir(row['Urun'], "1")
-                    st.rerun()
-            else:
-                st.markdown(f"**{row['Urun']}**")
+    if st.session_state.get(key_edit):
+        st.session_state[f"editing_{prefix}"] = row["Urun"]
+        st.session_state[key_edit] = None
+
+    if st.session_state.get(key_del):
+        hizli_sil(row["Urun"])
+        st.session_state[key_del] = None
+
 
 def liste_satiri_geri_al(prefix, i, row):
     # Oranlar: 1 (Buton) - 1 (Buton) - 20 (Metin)
@@ -650,6 +633,7 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
 
 
 
