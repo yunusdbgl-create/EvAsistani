@@ -10,7 +10,7 @@ import threading
 import random
 import streamlit.components.v1 as components
 
-# Grafik kütüphanesi kontrolü (Geri Getirildi)
+# Grafik kütüphanesi kontrolü
 try:
     import plotly.express as px
     GRAFIK_VAR = True
@@ -26,11 +26,11 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS VE HEAD (MOBİL UYUM + GÖRSELLİK)
+# 🖼️ CSS (V63 - EN STABİL VE TEMİZ SÜRÜM)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
-# 1. KISIM: HEAD
+# 1. HEAD (İkonlar)
 st.markdown(f"""
 <head>
     <link rel="icon" href="{APP_ICON_URL}">
@@ -39,95 +39,37 @@ st.markdown(f"""
 </head>
 """, unsafe_allow_html=True)
 
-# 2. KISIM: CSS (HAYALET BUTONLAR & YAPIŞIK DÜZEN)
+# 2. CSS (Sayfayı Bozmayan, Sadece Düzenleyen Stil)
 st.markdown("""
 <style>
-    /* 1. SAYFA KENARLARI */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 5rem !important;
-        padding-left: 5px !important;
-        padding-right: 5px !important;
-        max-width: 100% !important;
-        overflow-x: hidden !important;
-    }
-    
-    /* 2. SATIRLARI HİZALA (Sıfır Boşluk) */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: flex-start !important; /* Yukarı hizala ki metin uzarsa buton ortada kalmasın */
-        gap: 0px !important;
-        width: 100% !important;
-        margin-bottom: 5px !important; /* Satırlar arası az boşluk */
-        border-bottom: 1px solid #f0f0f0; /* Hafif çizgi ile ayır */
-        padding-bottom: 5px !important;
-    }
-    
-    /* 3. SÜTUN AYARLARI */
-    div[data-testid="column"] {
-        padding: 0 !important;
-        margin: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    /* İLK İKİ SÜTUN (Butonlar) - Çok dar */
-    div[data-testid="column"]:nth-of-type(1),
-    div[data-testid="column"]:nth-of-type(2) {
-        flex: 0 0 30px !important; /* Sadece 30px genişlik */
-        width: 30px !important;
-        min-width: 30px !important;
-    }
-
-    /* SON SÜTUN (Metin) */
-    div[data-testid="column"]:nth-of-type(3) {
-        flex: 1 1 auto !important;
-        justify-content: flex-start !important; /* Sola yasla */
-        padding-left: 5px !important;
-        min-width: 0 !important;
-    }
-    
-    /* 4. METİN DÜZENİ (Alt Satıra Geçiş Serbest) */
-    div[data-testid="column"] p, 
-    div[data-testid="column"] div, 
-    div[data-testid="column"] label {
-        white-space: normal !important; /* Alt satıra İN */
+    /* 1. UZUN METİNLERİN ALT SATIRA GEÇMESİNİ SAĞLA */
+    .stMarkdown, .stMarkdown p {
         word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
+        white-space: normal !important;
         font-size: 14px !important;
-        line-height: 1.4 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    
-    /* 5. HAYALET BUTONLAR (Senin istediğin HTML görünümü) */
-    button {
-        border: none !important; /* Çerçeve yok */
-        background: transparent !important; /* Arka plan yok */
-        padding: 0 !important;
-        margin: 0 !important;
-        height: auto !important;
-        min-height: 30px !important;
-        width: 30px !important;
-        box-shadow: none !important; /* Gölge yok */
-        font-size: 18px !important; /* İkonu büyüt */
-        color: #333 !important;
-    }
-    button:hover {
-        color: #FF4B4B !important;
-        background: transparent !important;
-    }
-    button:focus {
-        outline: none !important;
-        box-shadow: none !important;
     }
 
-    /* EXTRA */
-    .stCheckbox { margin-top: -3px !important; }
-    .category-line { height: 3px; border-radius: 2px; margin-bottom: 8px; margin-top: 5px; }
-    
+    /* 2. BUTONLARI MOBİL İÇİN KÜÇÜLT VE ORTALA */
+    button {
+        padding: 0.25rem 0.5rem !important;
+        height: auto !important;
+        min-height: 35px !important;
+        width: 100% !important;
+    }
+
+    /* 3. SÜTUNLARI DİKEYDE ORTALA (Buton ve yazı aynı hizada olsun) */
+    div[data-testid="column"] {
+        display: flex;
+        align-items: center; /* Dikey ortalama */
+    }
+
+    /* 4. MOBİLDE KENAR BOŞLUKLARINI AZALT AMA YOK ETME */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
     /* KUTU TASARIMLARI */
     .welcome-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -141,8 +83,10 @@ st.markdown("""
         text-align: center; margin-bottom: 15px;
         border: 2px solid white;
     }
+    .category-line { height: 3px; border-radius: 2px; margin-bottom: 5px; }
 </style>
 """, unsafe_allow_html=True)
+
 # YUKARI ÇIK BUTONU
 components.html("""
 <script>function topaGit() { window.parent.scrollTo({top: 0, behavior: 'smooth'}); }</script>
@@ -153,43 +97,19 @@ components.html("""
 # 🧠 İÇERİK KÜTÜPHANESİ
 # ==============================================================================
 def get_kategori_renk(kategori):
-    renkler = {
-        "Meyve": "#2ecc71", "Sebze": "#27ae60", "Manav": "#2ecc71",
-        "Et": "#c0392b", "Şarküteri": "#e74c3c", "Tavuk": "#d35400",
-        "Süt": "#3498db", "Kahvaltılık": "#f1c40f", "Peynir": "#f39c12",
-        "Temizlik": "#8e44ad", "Ev": "#9b59b6", "Deterjan": "#8e44ad",
-        "Gıda": "#e67e22", "Bakliyat": "#d35400", "Makarna": "#e67e22",
-        "Atıştırmalık": "#e84393", "Cips": "#ff7979", "Çikolata": "#e84393",
-        "İçecek": "#00cec9", "Su": "#74b9ff", "Genel": "#95a5a6"
-    }
+    renkler = {"Meyve": "#2ecc71", "Sebze": "#27ae60", "Manav": "#2ecc71", "Et": "#c0392b", "Süt": "#3498db", "Temizlik": "#8e44ad", "Gıda": "#e67e22", "Abur Cubur": "#e84393", "İçecek": "#00cec9", "Genel": "#95a5a6"}
     for key, color in renkler.items():
         if key in kategori: return color
     return "#34495e"
 
 def ask_kavanozu_sozleri():
-    return [
-        "Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", 
-        "Akşam çayı benden!", "Senin gülüşün güneşten daha parlak.", "Dünyanın en şanslı adamı benim.",
-        "Bir kahve molası verelim mi?", "Seni seviyorum, hem de çok!", "Bugün senin günün olsun.",
-        "Akşama en sevdiğin filmi izleyelim.", "Harika bir eşsin.", "Evin neşesi sensin.",
-        "Seninle yaşlanmak istiyorum.", "Sen benim en güzel şansımsın.", "Kalbimin sahibi sensin."
-    ]
+    return ["Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", "Akşam çayı benden!", "Seni seviyorum!", "Harika bir eşsin.", "Evin neşesi sensin.", "Sen benim şansımsın."]
 
 def prenses_sozleri():
-    return [
-        "🐈 Prenses: Mama kabım boşken bu uygulamada ne geziyorsun?",
-        "🐈 Prenses: Yunus'a söyle, o koltuk benim.",
-        "🐈 Prenses: Beni sevmeyi unuttunuz mu?",
-        "🐈 Prenses: Akşama balık mı var? Bana da ayırın.",
-        "🐈 Prenses: Miyav! (Tercümesi: Beni sevin!)",
-        "🐈 Prenses: Bugün çok tüy döktüm, evi süpürür müsün?",
-        "🐈 Prenses: O lazeri bir gün yakalayacağım!",
-        "🐈 Prenses: Uyuyorum, ses yapmayın.",
-        "🐈 Prenses: Kutular neden bu kadar güzel?"
-    ]
+    return ["🐈 Prenses: Mama kabım boş!", "🐈 Prenses: O koltuk benim.", "🐈 Prenses: Beni sevin!", "🐈 Prenses: Akşama balık mı var?", "🐈 Prenses: Miyav!", "🐈 Prenses: Uyuyorum, ses yapmayın.", "🐈 Prenses: Kutular neden bu kadar güzel?"]
 
 # ==============================================================================
-# 🔄 VERİTABANI VE İŞLEMLER
+# 🔄 VERİTABANI İŞLEMLERİ
 # ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -327,7 +247,7 @@ def alarm_kur(mesaj, sure):
 
 def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
     tum = set(); [tum.add(u.lower().split("(")[0].strip()) for u in marketten_gelenler]; [tum.add(u.lower()) for u in manuel_eklenenler]
-    tarifler = {"Menemen": ["yumurta", "domates", "biber"], "Omlet": ["yumurta", "peynir", "tereyağı"], "Makarna": ["makarna", "salça", "yağ"], "Köfte": ["kıyma", "soğan", "ekmek"], "Kısır": ["bulgur", "salça", "yeşillik"], "Patates Kızartması": ["patates", "yağ"], "Tavuk Sote": ["tavuk", "biber", "domates"], "Mercimek Çorbası": ["mercimek", "soğan", "salça"]}
+    tarifler = {"Menemen": ["yumurta", "domates", "biber"], "Omlet": ["yumurta", "peynir", "tereyağı"], "Makarna": ["makarna", "salça", "yağ"], "Köfte": ["kıyma", "soğan", "ekmek"]}
     tam, eksik = [], []
     for y, m in tarifler.items():
         e = [x for x in m if x not in tum]
@@ -354,44 +274,35 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# LİSTELEME MODÜLÜ (SIFIR BOŞLUK)
+# LİSTELEME MODÜLÜ (SAĞLAM VE YAN YANA)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
+    # DÜZENLEME MODU (Form açar)
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
         with st.form(key=f"edit_form_{prefix}_{i}"):
             yeni = st.text_input("Dzn:", value=row['Urun'])
             c1, c2 = st.columns(2)
-            if c1.form_submit_button("💾"): 
-                hizli_duzenle(row['Urun'], yeni)
-                st.session_state[f"editing_{prefix}"] = None
-                st.rerun()
-            if c2.form_submit_button("❌"): 
-                st.session_state[f"editing_{prefix}"] = None
-                st.rerun()
+            if c1.form_submit_button("💾"): hizli_duzenle(row['Urun'], yeni); st.session_state[f"editing_{prefix}"] = None; st.rerun()
+            if c2.form_submit_button("❌"): st.session_state[f"editing_{prefix}"] = None; st.rerun()
     else:
-        # PİKSEL HİZALAMA İÇİN ORANLAR (CSS 30px'e zorlayacak)
-        c1, c2, c3 = st.columns([0.1, 0.1, 0.8], gap="small", vertical_alignment="center")
+        # NORMAL MOD: [Düzenle] [Sil] [Metin]
+        # Mobilde en iyi oran budur:
+        c1, c2, c3 = st.columns([0.15, 0.15, 0.70], gap="small", vertical_alignment="center")
         
-        # 1. Buton: Düzenle (Hayalet Mod)
         with c1:
             if st.button("✏️", key=f"ed_{prefix}_{i}"):
                 st.session_state[f"editing_{prefix}"] = row['Urun']
                 st.rerun()
-
-        # 2. Buton: Sil (Hayalet Mod)
         with c2:
             if not st.session_state.get(f"conf_{prefix}_{i}"):
                 if st.button("🗑️", key=f"del_{prefix}_{i}"): 
                     st.session_state[f"conf_{prefix}_{i}"] = True
                     st.rerun()
             else:
-                # Onay modu (Kırmızı yanar)
-                if st.button("✅", key=f"yes_{prefix}_{i}", type="primary"):
+                if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"): 
                     hizli_sil(row['Urun'])
                     st.session_state[f"conf_{prefix}_{i}"] = False
                     st.rerun()
-
-        # 3. Metin (Geri kalan alan)
         with c3:
             if checkbox_var:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"):
@@ -401,18 +312,14 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.markdown(f"**{row['Urun']}**")
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.1, 0.1, 0.8], gap="small", vertical_alignment="center")
-    
+    c1, c2, c3 = st.columns([0.15, 0.15, 0.70], gap="small", vertical_alignment="center")
     with c1:
-        if st.button(f"➕", key=f"back_{prefix}_{i}", use_container_width=True): 
-            hizli_durum_degistir(row['Urun'], "0")
-            st.rerun()
+        if st.button(f"➕", key=f"back_{prefix}_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
     with c2:
-        if st.button("🗑️", key=f"del_fin_{prefix}_{i}"): 
-            hizli_sil(row['Urun'])
-            st.rerun()
+         if st.button("🗑️", key=f"del_fin_{prefix}_{i}"): hizli_sil(row['Urun']); st.rerun()
     with c3:
         st.markdown(f"~~{row['Urun']}~~")
+
 # ==============================================================================
 # SAYFALAR
 # ==============================================================================
@@ -445,16 +352,17 @@ def sayfa_ana_ekran():
                     for i, row in items.iterrows(): liste_satiri_olustur("m", i, row)
         
         st.divider()
-        
-        # --- GERİ GETİRİLEN KATEGORİLİ GEÇMİŞ ---
         alinan = df_m[df_m["Durum"] == "1"]
         with st.expander(f"📦 Geçmiş / Alınanlar ({len(alinan)})", expanded=False):
             if not alinan.empty:
                 for kat in kat_list:
                     items = alinan[(alinan["Mesaj"] == "") | (alinan["Mesaj"] == "Genel") | (alinan["Mesaj"] == "None")] if kat == "Genel" else alinan[alinan["Mesaj"] == kat]
                     if not items.empty:
-                        with st.expander(f"{kat} ({len(items)})"): # İÇ İÇE EXPANDER GERİ GELDİ
-                            for i, row in items.iterrows(): liste_satiri_geri_al("m", i, row)
+                        renk = get_kategori_renk(kat)
+                        st.markdown(f"**{kat}**")
+                        st.markdown(f"<div class='category-line' style='background-color:{renk};'></div>", unsafe_allow_html=True)
+                        for i, row in items.iterrows(): liste_satiri_geri_al("m", i, row)
+                        st.write("")
 
     with tab2:
         df_t = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
@@ -512,7 +420,6 @@ def sayfa_ekonomi():
             with c2: st.text_area("Not", height=100, key="yat_not"); st.button("KAYDET", key="btn_yat", on_click=yatirim_callback)
         df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]; st.markdown("---")
         
-        # --- GRAFİK GERİ GELDİ ---
         if not df_y.empty:
             df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if str(x).replace('.','',1).isdigit() else 0)
             toplam = df_y["Tutar"].sum()
@@ -523,7 +430,6 @@ def sayfa_ekonomi():
                     fig = px.pie(df_y, values='Tutar', names='Urun', hole=0.4)
                     fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=200, showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
-        
         st.divider()
         for i, row in df_y.iterrows():
             c1, c2, c3 = st.columns([0.8, 0.1, 0.1], gap="small", vertical_alignment="center")
@@ -536,7 +442,6 @@ def sayfa_yemekler():
     with st.expander("⚙️"): 
         if st.button("🧹 Temizle"): listeyi_temizle()
     with tab1:
-        # TINDER STİLİ GERİ GELDİ
         df_o = st.session_state.local_df[(st.session_state.local_df["Tip"].isin(["YEMEK_OGUN", "YEMEK_KAHVALTI"])) & (st.session_state.local_df["Durum"] == "1")]
         lst = df_o["Urun"].tolist()
         if lst:
@@ -576,8 +481,6 @@ def sayfa_yasam():
     with tab2:
         with st.expander("➕ Ekle", expanded=True): st.text_input("Ad", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih"); st.button("KAYDET", key="btn_syc", on_click=sayac_callback)
         df_s = st.session_state.local_df[st.session_state.local_df["Tip"] == "COUNTDOWN"]; st.markdown("---"); bugun = datetime.now().date()
-        
-        # --- SAYAÇ GÖRÜNÜMÜ ESKİSİ GİBİ ---
         for i, row in df_s.iterrows():
             try:
                 hedef = datetime.strptime(row["Zaman"], "%Y-%m-%d").date(); kalan = (hedef - bugun).days
@@ -622,10 +525,3 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
-
-
-
-
-
-
-
