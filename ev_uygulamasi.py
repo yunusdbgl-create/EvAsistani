@@ -51,13 +51,7 @@ button {
 
 
 # 1. KISIM: HEAD
-st.markdown(f"""
-<head>
-    <link rel="icon" href="{APP_ICON_URL}">
-    <link rel="apple-touch-icon" href="{APP_ICON_URL}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-</head>
-""", unsafe_allow_html=True)
+
 
 # 2. KISIM: CSS (SIFIR BOŞLUK & YAPIŞIK DÜZEN)
 st.markdown("""
@@ -619,6 +613,7 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
 
 
 
