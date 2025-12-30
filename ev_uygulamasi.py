@@ -10,13 +10,6 @@ import threading
 import random
 import streamlit.components.v1 as components
 
-# Grafik kütüphanesi
-try:
-    import plotly.express as px
-    GRAFIK_VAR = True
-except ImportError:
-    GRAFIK_VAR = False
-
 # ==============================================================================
 # ⚙️ AYARLAR
 # ==============================================================================
@@ -26,11 +19,10 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS (V69 - NÜKLEER KİLİT)
+# 🖼️ CSS (V70 - MOBİL ZORLAMA / FORCE MOBILE ROW)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
-# 1. HEAD
 st.markdown(f"""
 <head>
     <link rel="icon" href="{APP_ICON_URL}">
@@ -39,62 +31,80 @@ st.markdown(f"""
 </head>
 """, unsafe_allow_html=True)
 
-# 2. CSS (KESİN ÇÖZÜM)
 st.markdown("""
 <style>
-    /* 1. SAYFA GENİŞLİĞİNİ KONTROL ET */
+    /* 1. GENEL SAYFA AYARLARI */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 5rem !important;
         padding-left: 5px !important;
         padding-right: 5px !important;
-        max-width: 100vw !important;
+        max-width: 100% !important;
         overflow-x: hidden !important;
     }
 
-    /* 2. TÜM SÜTUNLARI YAN YANA ZORLA (MOBİL DAHİL) */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important; /* Yan yana zorla */
-        flex-wrap: nowrap !important;   /* Asla sarma */
-        align-items: center !important;
-        gap: 2px !important; /* Çok az boşluk */
-        width: 100% !important;
+    /* ============================================================
+       MOBİL GÖRÜNÜM (EKRAN 640px'den KÜÇÜKSE DEVREYE GİRER)
+       BU KISIM STREAMLIT'İN OTOMATİK DAVRANIŞINI İPTAL EDER
+    ============================================================ */
+    @media only screen and (max-width: 640px) {
+        
+        /* 1. Satırları ZORLA Yan Yana Tut */
+        div[data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important; /* Alt alta inmeyi yasakla */
+            flex-wrap: nowrap !important;
+            gap: 0px !important;
+        }
+
+        /* 2. Sütun Genişliklerini ZORLA Ayarla */
+        div[data-testid="column"] {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-width: 0 !important;
+        }
+
+        /* Düzenle Butonu (1. Sütun) -> 35px */
+        div[data-testid="column"]:nth-of-type(1) {
+            flex: 0 0 35px !important;
+            width: 35px !important;
+            max-width: 35px !important;
+            min-width: 35px !important;
+            overflow: hidden !important;
+        }
+
+        /* Sil Butonu (2. Sütun) -> 35px */
+        div[data-testid="column"]:nth-of-type(2) {
+            flex: 0 0 35px !important;
+            width: 35px !important;
+            max-width: 35px !important;
+            min-width: 35px !important;
+            overflow: hidden !important;
+        }
+
+        /* Metin Alanı (3. Sütun) -> Geriye Kalan Her Şey */
+        div[data-testid="column"]:nth-of-type(3) {
+            flex: 1 1 auto !important;
+            width: auto !important;
+            justify-content: flex-start !important;
+            padding-left: 5px !important;
+        }
     }
 
-    /* 3. SÜTUN GENİŞLİKLERİNİ ÇİVİLE */
-    
-    /* Buton Sütunları (1 ve 2) -> 35px KİLİT */
-    div[data-testid="column"]:nth-of-type(1), 
-    div[data-testid="column"]:nth-of-type(2) {
-        flex: 0 0 35px !important;
-        width: 35px !important;
-        min-width: 35px !important;
-        max-width: 35px !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: hidden !important;
-    }
-
-    /* Metin Sütunu (3) -> ESNEK */
-    div[data-testid="column"]:nth-of-type(3) {
-        flex: 1 1 auto !important;
-        min-width: 50px !important;
-        padding-left: 5px !important;
-        overflow: visible !important;
-    }
-
-    /* 4. METİN DÜZENİ (Alt satıra geçsin) */
+    /* 3. METİN AYARLARI (Her zaman geçerli) */
     div[data-testid="column"] p, 
     div[data-testid="column"] div {
-        white-space: normal !important; /* Alt satıra in */
-        word-wrap: break-word !important;
+        white-space: normal !important; /* Alt satıra geçiş serbest */
+        word-break: break-word !important;
         font-size: 14px !important;
         line-height: 1.2 !important;
         margin: 0 !important;
     }
 
-    /* 5. BUTONLAR */
+    /* 4. BUTON GÖRÜNÜMÜ */
     button {
         padding: 0 !important;
         margin: 0 !important;
@@ -102,7 +112,11 @@ st.markdown("""
         min-height: 35px !important;
         width: 100% !important;
         border: none !important;
+        background: transparent !important;
     }
+    
+    /* İkon Boyutu */
+    button div p { font-size: 18px !important; margin: 0 !important; }
 
     /* EKSTRALAR */
     .stCheckbox { margin-top: -4px !important; }
@@ -134,7 +148,7 @@ def prenses_sozleri():
     return ["🐈 Prenses: Mama kabım boş!", "🐈 Prenses: O koltuk benim.", "🐈 Prenses: Beni sevin!", "🐈 Prenses: Akşama balık mı var?", "🐈 Prenses: Miyav!", "🐈 Prenses: Uyuyorum, ses yapmayın.", "🐈 Prenses: Kutular neden bu kadar güzel?"]
 
 # ==============================================================================
-# 🔄 VERİTABANI İŞLEMLERİ
+# 🔄 VERİTABANI
 # ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -299,10 +313,9 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# LİSTELEME MODÜLÜ (V69 - NÜKLEER KİLİT)
+# LİSTELEME MODÜLÜ (V70 - ZORLANMIŞ MOBİL SATIR)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
-    # Düzenleme Modu
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
         with st.form(key=f"edit_form_{prefix}_{i}"):
             yeni = st.text_input("Dzn:", value=row['Urun'])
@@ -315,9 +328,9 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.session_state[f"editing_{prefix}"] = None
                 st.rerun()
     else:
-        # PÜF NOKTASI: [Düzenle] [Sil] [Metin]
-        # Oranları çok küçük (0.01) veriyoruz ki CSS'in 35px emri baskın gelsin.
-        c1, c2, c3 = st.columns([0.01, 0.01, 1], gap="small", vertical_alignment="center")
+        # PİKSEL HİZALAMA İÇİN ORANLAR (CSS BİZE YARDIM EDECEK)
+        # CSS @media query ile mobilde bunları zorla 35px, 35px, Auto yapacak.
+        c1, c2, c3 = st.columns([0.1, 0.1, 1], gap="small", vertical_alignment="center")
         
         with c1:
             if st.button("✏️", key=f"ed_{prefix}_{i}"):
@@ -342,7 +355,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.markdown(f"**{row['Urun']}**")
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.01, 0.01, 1], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.1, 0.1, 1], gap="small", vertical_alignment="center")
     
     with c1:
         if st.button(f"➕", key=f"back_{prefix}_{i}", use_container_width=True): 
@@ -455,16 +468,19 @@ def sayfa_ekonomi():
             with c2: st.text_area("Not", height=100, key="yat_not"); st.button("KAYDET", key="btn_yat", on_click=yatirim_callback)
         df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]; st.markdown("---")
         
-        if not df_y.empty:
-            df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if str(x).replace('.','',1).isdigit() else 0)
-            toplam = df_y["Tutar"].sum()
-            c1, c2 = st.columns([1, 2])
-            with c1: st.metric("TOPLAM", f"{toplam:,.0f} ₺")
-            with c2:
-                if GRAFIK_VAR:
+        # --- GRAFİK ---
+        try:
+            if GRAFIK_VAR and not df_y.empty:
+                df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if str(x).replace('.','',1).isdigit() else 0)
+                toplam = df_y["Tutar"].sum()
+                c1, c2 = st.columns([1, 2])
+                with c1: st.metric("TOPLAM", f"{toplam:,.0f} ₺")
+                with c2:
                     fig = px.pie(df_y, values='Tutar', names='Urun', hole=0.4)
                     fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=200, showlegend=False)
                     st.plotly_chart(fig, use_container_width=True)
+        except: pass
+        
         st.divider()
         for i, row in df_y.iterrows():
             c1, c2, c3 = st.columns([0.8, 0.1, 0.1], gap="small", vertical_alignment="center")
