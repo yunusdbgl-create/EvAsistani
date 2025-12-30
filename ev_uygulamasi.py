@@ -39,50 +39,57 @@ st.markdown(f"""
 </head>
 """, unsafe_allow_html=True)
 
-# 2. KISIM: CSS (MENÜLERİ VE EKLEME KISMINI KURTARAN FİNAL)
+# 2. KISIM: CSS (BUTONLAR SOLDTA - SAĞLAM YAPI)
 st.markdown("""
 <style>
-    /* 1. SAYFA KENARLARI (Menülerin görünmesi için şart) */
+    /* 1. SAYFA KENARLARI */
     .block-container {
-        padding-top: 2rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 5rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-left: 5px !important;
+        padding-right: 5px !important;
         max-width: 100% !important;
         overflow-x: hidden !important;
     }
     
-    /* 2. SATIR DAVRANIŞI (Akıllı Sarma) */
+    /* 2. SATIRLARI YAN YANA TUT */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: wrap !important; /* Sığmazsa alt satıra geç (Ekle butonu için şart) */
+        flex-wrap: nowrap !important; /* Asla alt satıra geçme */
         align-items: center !important;
-        gap: 5px !important;
+        gap: 2px !important;
         width: 100% !important;
     }
     
     /* 3. SÜTUN AYARLARI */
     div[data-testid="column"] {
         display: flex !important;
-        flex-direction: column !important; /* İçeriği dikey hizala */
+        align-items: center !important;
         justify-content: center !important;
-        min-width: 0 !important; /* İçeriğin taşmasını engelle */
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    /* İSİM / GİRİŞ ALANI (Sol Sütun) - Genişler */
-    div[data-testid="column"]:nth-of-type(1) {
-        flex: 1 1 150px !important; /* En az 150px yer kapla, gerisini doldur */
+    /* İLK İKİ SÜTUN (Butonlar - Solda) */
+    div[data-testid="column"]:nth-of-type(1),
+    div[data-testid="column"]:nth-of-type(2) {
+        flex: 0 0 40px !important; /* Sabit 40px genişlik */
+        width: 40px !important;
+        min-width: 40px !important;
+        max-width: 40px !important;
+    }
+
+    /* SON SÜTUN (Metin - Sağda) */
+    div[data-testid="column"]:nth-of-type(3) {
+        flex: 1 1 auto !important; /* Kalan tüm alanı kapla */
+        justify-content: flex-start !important; /* Sola yasla */
+        padding-left: 5px !important;
         overflow: hidden !important;
     }
-
-    /* BUTONLAR / KATEGORİ (Sağ Sütunlar) - Daralır ama kaybolmaz */
-    div[data-testid="column"]:not(:first-child) {
-        flex: 0 1 auto !important; /* İhtiyacı kadar yer kaplasın */
-        min-width: 40px !important; /* Buton için minimum genişlik */
-    }
     
-    /* 4. YAZI DÜZENİ (... ile kısaltma) */
+    /* 4. METİN DÜZENİ */
     div[data-testid="column"] p, 
     div[data-testid="column"] div, 
     div[data-testid="column"] label {
@@ -94,17 +101,17 @@ st.markdown("""
         width: 100% !important;
     }
     
-    /* 5. BUTON GÖRÜNÜMÜ (Mobil Uyumlu) */
+    /* 5. BUTONLAR */
     button {
-        padding: 0px 8px !important;
+        padding: 0 !important;
         margin: 0 !important;
-        height: 40px !important;
-        min-height: 40px !important;
-        width: 100% !important; /* Sütuna tam otur */
-        line-height: 1 !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        width: 100% !important;
     }
 
-    /* 6. KUTU VE RENKLER */
+    /* 6. GÖRSEL EKSTRALAR */
+    .stCheckbox { margin-top: -2px !important; }
     .welcome-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; padding: 15px; border-radius: 12px;
@@ -119,7 +126,6 @@ st.markdown("""
     }
     .welcome-title { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
     .category-line { height: 3px; border-radius: 2px; margin-bottom: 5px; }
-    .stCheckbox { margin-top: -2px !important; }
 </style>
 """, unsafe_allow_html=True)
 # YUKARI ÇIK BUTONU
@@ -333,37 +339,68 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# LİSTELEME MODÜLÜ (ÇİVİ GİBİ SABİT)
+# LİSTELEME MODÜLÜ (BUTONLAR SOLDA)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
+    # Eğer düzenleme modundaysa form göster
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
         with st.form(key=f"edit_form_{prefix}_{i}"):
             yeni = st.text_input("Dzn:", value=row['Urun'])
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("💾"): hizli_duzenle(row['Urun'], yeni); st.session_state[f"editing_{prefix}"] = None; st.rerun()
-            if c2.form_submit_button("❌"): st.session_state[f"editing_{prefix}"] = None; st.rerun()
+            c_save, c_cancel = st.columns(2)
+            if c_save.form_submit_button("💾"): 
+                hizli_duzenle(row['Urun'], yeni)
+                st.session_state[f"editing_{prefix}"] = None
+                st.rerun()
+            if c_cancel.form_submit_button("❌"): 
+                st.session_state[f"editing_{prefix}"] = None
+                st.rerun()
     else:
-        c1, c2, c3 = st.columns([0.7, 0.15, 0.15], gap="small", vertical_alignment="center")
+        # SÜTUN SIRASI: [DÜZENLE] - [SİL] - [METİN]
+        # Oranlar: 0.15 (Buton) - 0.15 (Buton) - 0.70 (Metin)
+        c1, c2, c3 = st.columns([0.15, 0.15, 0.70], gap="small", vertical_alignment="center")
+        
+        # 1. Sütun: Düzenle Butonu
         with c1:
-            if checkbox_var:
-                if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-            else: st.markdown(f"**{row['Urun']}**")
+            if st.button("✏️", key=f"ed_{prefix}_{i}"):
+                st.session_state[f"editing_{prefix}"] = row['Urun']
+                st.rerun()
+
+        # 2. Sütun: Sil Butonu
         with c2:
-            if st.button("✏️", key=f"ed_{prefix}_{i}"): st.session_state[f"editing_{prefix}"] = row['Urun']; st.rerun()
-        with c3:
             if not st.session_state.get(f"conf_{prefix}_{i}"):
-                if st.button("🗑️", key=f"del_{prefix}_{i}"): st.session_state[f"conf_{prefix}_{i}"] = True; st.rerun()
+                if st.button("🗑️", key=f"del_{prefix}_{i}"): 
+                    st.session_state[f"conf_{prefix}_{i}"] = True
+                    st.rerun()
             else:
-                if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"): hizli_sil(row['Urun']); st.session_state[f"conf_{prefix}_{i}"] = False; st.rerun()
+                if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"):
+                    hizli_sil(row['Urun'])
+                    st.session_state[f"conf_{prefix}_{i}"] = False
+                    st.rerun()
+
+        # 3. Sütun: Metin / Checkbox (En Geniş Alan)
+        with c3:
+            if checkbox_var:
+                if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"):
+                    hizli_durum_degistir(row['Urun'], "1")
+                    st.rerun()
+            else:
+                st.markdown(f"**{row['Urun']}**")
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.7, 0.15, 0.15], gap="small", vertical_alignment="center")
+    # SÜTUN SIRASI: [GERİ AL] - [SİL] - [METİN]
+    c1, c2, c3 = st.columns([0.15, 0.15, 0.70], gap="small", vertical_alignment="center")
+    
     with c1:
-        if st.button(f"➕ {row['Urun']}", key=f"back_{prefix}_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
+        if st.button(f"➕", key=f"back_{prefix}_{i}", use_container_width=True): # Geri al butonu
+            hizli_durum_degistir(row['Urun'], "0")
+            st.rerun()
     with c2:
-         if st.button("✏️", key=f"ed_fin_{prefix}_{i}"): st.session_state[f"editing_{prefix}"] = row['Urun']; st.rerun()
+        if st.button("🗑️", key=f"del_fin_{prefix}_{i}"): # Sil butonu
+            hizli_sil(row['Urun'])
+            st.rerun()
     with c3:
-        if st.button("🗑️", key=f"del_fin_{prefix}_{i}"): hizli_sil(row['Urun']); st.rerun()
+        # Metin
+        st.markdown(f"~~{row['Urun']}~~") # Üstü çizili göster
 
 # ==============================================================================
 # SAYFALAR
@@ -574,6 +611,7 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
 
 
 
