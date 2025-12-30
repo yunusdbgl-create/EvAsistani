@@ -10,7 +10,7 @@ import threading
 import random
 import streamlit.components.v1 as components
 
-# Grafik kütüphanesi kontrolü
+# Grafik kütüphanesi
 try:
     import plotly.express as px
     GRAFIK_VAR = True
@@ -26,84 +26,83 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS (V63 - EN STABİL VE TEMİZ SÜRÜM)
+# 🖼️ CSS (V69 - NÜKLEER KİLİT)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
-# 2. KISIM: CSS (V68 - PİKSEL KİLİT VE SIFIR BOŞLUK)
+# 1. HEAD
+st.markdown(f"""
+<head>
+    <link rel="icon" href="{APP_ICON_URL}">
+    <link rel="apple-touch-icon" href="{APP_ICON_URL}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+</head>
+""", unsafe_allow_html=True)
+
+# 2. CSS (KESİN ÇÖZÜM)
 st.markdown("""
 <style>
-    /* 1. EKRAN TAŞMASINI ENGELLE */
+    /* 1. SAYFA GENİŞLİĞİNİ KONTROL ET */
     .block-container {
         padding-top: 1rem !important;
+        padding-bottom: 5rem !important;
         padding-left: 5px !important;
         padding-right: 5px !important;
         max-width: 100vw !important;
         overflow-x: hidden !important;
     }
 
-    /* 2. SATIR YAPISI (HATA PAYI YOK) */
+    /* 2. TÜM SÜTUNLARI YAN YANA ZORLA (MOBİL DAHİL) */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important; /* Asla alt alta inme */
+        flex-direction: row !important; /* Yan yana zorla */
+        flex-wrap: nowrap !important;   /* Asla sarma */
         align-items: center !important;
-        gap: 2px !important; /* Butonlar arası 2px boşluk */
+        gap: 2px !important; /* Çok az boşluk */
         width: 100% !important;
     }
 
-    /* 3. SÜTUNLARI ÇİVİLEME */
-    div[data-testid="column"] {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    /* BUTON SÜTUNLARI (1 ve 2) -> SABİT 32px */
-    div[data-testid="column"]:nth-of-type(1),
+    /* 3. SÜTUN GENİŞLİKLERİNİ ÇİVİLE */
+    
+    /* Buton Sütunları (1 ve 2) -> 35px KİLİT */
+    div[data-testid="column"]:nth-of-type(1), 
     div[data-testid="column"]:nth-of-type(2) {
-        flex: 0 0 32px !important; /* Genişleyemez */
-        width: 32px !important;
-        min-width: 32px !important;
+        flex: 0 0 35px !important;
+        width: 35px !important;
+        min-width: 35px !important;
+        max-width: 35px !important;
+        padding: 0 !important;
+        margin: 0 !important;
         overflow: hidden !important;
     }
 
-    /* METİN SÜTUNU (3) -> ESNEK */
+    /* Metin Sütunu (3) -> ESNEK */
     div[data-testid="column"]:nth-of-type(3) {
-        flex: 1 1 auto !important; /* Kalan tüm boşluğu al */
-        min-width: 0 !important; /* KRİTİK KOD: İçeriğin taşmasını engeller */
-        justify-content: flex-start !important;
+        flex: 1 1 auto !important;
+        min-width: 50px !important;
         padding-left: 5px !important;
+        overflow: visible !important;
     }
 
-    /* 4. METİN DÜZENİ (Tek Satır + ...) */
+    /* 4. METİN DÜZENİ (Alt satıra geçsin) */
     div[data-testid="column"] p, 
     div[data-testid="column"] div {
-        white-space: nowrap !important; /* Alt satıra inme */
-        overflow: hidden !important;
-        text-overflow: ellipsis !important; /* Sığmazsa ... koy */
+        white-space: normal !important; /* Alt satıra in */
+        word-wrap: break-word !important;
         font-size: 14px !important;
+        line-height: 1.2 !important;
         margin: 0 !important;
-        width: 100% !important;
     }
 
-    /* 5. BUTONLAR (MİNİK) */
+    /* 5. BUTONLAR */
     button {
         padding: 0 !important;
         margin: 0 !important;
-        height: 32px !important;
-        min-height: 32px !important;
-        width: 32px !important;
+        height: 35px !important;
+        min-height: 35px !important;
+        width: 100% !important;
         border: none !important;
-        background: transparent !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
     }
-    /* Buton İkon Boyutu */
-    button p { font-size: 16px !important; }
 
     /* EKSTRALAR */
     .stCheckbox { margin-top: -4px !important; }
@@ -112,6 +111,7 @@ st.markdown("""
     .category-line { height: 3px; border-radius: 2px; margin-bottom: 5px; }
 </style>
 """, unsafe_allow_html=True)
+
 # YUKARI ÇIK BUTONU
 components.html("""
 <script>function topaGit() { window.parent.scrollTo({top: 0, behavior: 'smooth'}); }</script>
@@ -299,22 +299,7 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# LİSTELEME MODÜLÜ (SAĞLAM VE YAN YANA)
-# ==============================================================================
-# ==============================================================================
-# LİSTELEME MODÜLÜ (MOBİL ZORLAMA)
-# ==============================================================================
-# ==============================================================================
-# LİSTELEME MODÜLÜ (V65 - KUSURSUZ GRID)
-# ==============================================================================
-# ==============================================================================
-# LİSTELEME MODÜLÜ (MOBİL ZORLAMA)
-# ==============================================================================
-# ==============================================================================
-# LİSTELEME MODÜLÜ (V67 - KİLİTLİ)
-# ==============================================================================
-# ==============================================================================
-# LİSTELEME MODÜLÜ (V68 - PİKSEL KİLİT)
+# LİSTELEME MODÜLÜ (V69 - NÜKLEER KİLİT)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
     # Düzenleme Modu
@@ -330,17 +315,14 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.session_state[f"editing_{prefix}"] = None
                 st.rerun()
     else:
-        # PÜF NOKTASI: Oranlar önemsiz, CSS ile 32px'e çiviledik.
-        # Yine de mantıklı bir oran verelim.
-        c1, c2, c3 = st.columns([1, 1, 15], gap="small", vertical_alignment="center")
+        # PÜF NOKTASI: [Düzenle] [Sil] [Metin]
+        # Oranları çok küçük (0.01) veriyoruz ki CSS'in 35px emri baskın gelsin.
+        c1, c2, c3 = st.columns([0.01, 0.01, 1], gap="small", vertical_alignment="center")
         
-        # 1. DÜZENLE (32px)
         with c1:
             if st.button("✏️", key=f"ed_{prefix}_{i}"):
                 st.session_state[f"editing_{prefix}"] = row['Urun']
                 st.rerun()
-
-        # 2. SİL (32px)
         with c2:
             if not st.session_state.get(f"conf_{prefix}_{i}"):
                 if st.button("🗑️", key=f"del_{prefix}_{i}"): 
@@ -351,8 +333,6 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                     hizli_sil(row['Urun'])
                     st.session_state[f"conf_{prefix}_{i}"] = False
                     st.rerun()
-
-        # 3. METİN (Geriye kalan her yer)
         with c3:
             if checkbox_var:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"):
@@ -362,7 +342,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 st.markdown(f"**{row['Urun']}**")
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([1, 1, 15], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.01, 0.01, 1], gap="small", vertical_alignment="center")
     
     with c1:
         if st.button(f"➕", key=f"back_{prefix}_{i}", use_container_width=True): 
@@ -374,6 +354,7 @@ def liste_satiri_geri_al(prefix, i, row):
             st.rerun()
     with c3:
         st.markdown(f"~~{row['Urun']}~~")
+
 # ==============================================================================
 # SAYFALAR
 # ==============================================================================
@@ -579,8 +560,3 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
-
-
-
-
-
