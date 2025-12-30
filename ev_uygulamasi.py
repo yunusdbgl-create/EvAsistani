@@ -26,7 +26,7 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS VE HEAD (V59 - AYRIŞTIRILMIŞ VE HATASIZ)
+# 🖼️ CSS VE HEAD (V60 - AYRIŞTIRILMIŞ VE HATASIZ)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
@@ -364,14 +364,19 @@ def sayfa_ana_ekran():
         VARSAYILAN = ["🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt", "🍞 Gıda", "🧹 Temizlik", "🍫 Atıştırmalık"]
         kayitli = {k for k in set(df_m["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni"]}
         TUM = sorted(list(set(VARSAYILAN) | kayitli)) + ["✏️ Yeni"]
+        
         c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="bottom")
         with c1: st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün...")
         with c2: st.selectbox("Kat.", TUM, key="market_kategori_secim", label_visibility="collapsed")
         with c3: st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
         if st.session_state.market_kategori_secim == "✏️ Yeni": st.text_input("Yeni Kat.", key="market_kategori_yeni")
         st.markdown("---")
-        alinacak = df_m[df_m["Durum"] == "0"]; kat_list = sorted(list(set(TUM[:-1]) | {"Genel"})); 
+        
+        alinacak = df_m[df_m["Durum"] == "0"]
+        kat_list = sorted(list(set(TUM[:-1]) | {"Genel"}))
         if "Genel" in kat_list: kat_list.remove("Genel"); kat_list.append("Genel")
+        
+        # ALINACAKLAR LİSTESİ
         for kat in kat_list:
             items = alinacak[(alinacak["Mesaj"] == "") | (alinacak["Mesaj"] == "Genel") | (alinacak["Mesaj"] == "None")] if kat == "Genel" else alinacak[alinacak["Mesaj"] == kat]
             if not items.empty:
@@ -379,11 +384,24 @@ def sayfa_ana_ekran():
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
                     st.markdown(f"<div class='category-line' style='background-color:{renk};'></div>", unsafe_allow_html=True)
                     for i, row in items.iterrows(): liste_satiri_olustur("m", i, row)
+        
         st.divider()
+        
+        # ALINANLAR LİSTESİ (ARTIK KATEGORİLİ!)
         alinan = df_m[df_m["Durum"] == "1"]
         with st.expander(f"📦 Alınanlar ({len(alinan)})", expanded=False):
             if not alinan.empty:
-                for i, row in alinan.iterrows(): liste_satiri_geri_al("m", i, row)
+                for kat in kat_list:
+                    # Kategoriye göre filtrele
+                    items = alinan[(alinan["Mesaj"] == "") | (alinan["Mesaj"] == "Genel") | (alinan["Mesaj"] == "None")] if kat == "Genel" else alinan[alinan["Mesaj"] == kat]
+                    if not items.empty:
+                        renk = get_kategori_renk(kat)
+                        # Kategori başlığı ve çizgisi
+                        st.markdown(f"**{kat}**") 
+                        st.markdown(f"<div class='category-line' style='background-color:{renk};'></div>", unsafe_allow_html=True)
+                        for i, row in items.iterrows(): liste_satiri_geri_al("m", i, row)
+                        st.write("") # Boşluk
+
     with tab2:
         df_t = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
         c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="bottom")
