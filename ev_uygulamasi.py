@@ -39,77 +39,72 @@ st.markdown(f"""
 </head>
 """, unsafe_allow_html=True)
 
-# 2. KISIM: CSS (MENÜLERİ KURTARAN & EKRANA SIĞDIRAN FİNAL SÜRÜM)
+# 2. KISIM: CSS (MENÜLERİ VE EKLEME KISMINI KURTARAN FİNAL)
 st.markdown("""
 <style>
-    /* 1. SAYFA KENAR BOŞLUKLARI (Menüler Geri Gelsin) */
+    /* 1. SAYFA KENARLARI (Menülerin görünmesi için şart) */
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 5rem !important;
-        padding-left: 1rem !important;  /* Soldan boşluk */
-        padding-right: 1rem !important; /* Sağdan boşluk (Menü için şart) */
-        max-width: 100vw !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max-width: 100% !important;
         overflow-x: hidden !important;
     }
     
-    /* 2. SATIRLARI TEK HİZADA TUT (Asla Kayma Yapmaz) */
+    /* 2. SATIR DAVRANIŞI (Akıllı Sarma) */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: nowrap !important; /* Alt satıra inmek yasak */
+        flex-wrap: wrap !important; /* Sığmazsa alt satıra geç (Ekle butonu için şart) */
         align-items: center !important;
-        gap: 5px !important; /* Öğeler arası minik boşluk */
+        gap: 5px !important;
         width: 100% !important;
     }
     
-    /* 3. SÜTUN AYARLARI (Mobil Sıkıştırma) */
+    /* 3. SÜTUN AYARLARI */
     div[data-testid="column"] {
-        padding: 0 !important;
-        margin: 0 !important;
-        min-width: 0 !important; /* İçerik taşarsa sütunu genişletme */
+        display: flex !important;
+        flex-direction: column !important; /* İçeriği dikey hizala */
+        justify-content: center !important;
+        min-width: 0 !important; /* İçeriğin taşmasını engelle */
     }
 
-    /* SOL SÜTUN (Yazı Alanı) - Esnek */
+    /* İSİM / GİRİŞ ALANI (Sol Sütun) - Genişler */
     div[data-testid="column"]:nth-of-type(1) {
-        flex: 1 1 auto !important; /* Kalan tüm boşluğu kapla */
-        overflow: hidden !important; /* Taşanı gizle */
+        flex: 1 1 150px !important; /* En az 150px yer kapla, gerisini doldur */
+        overflow: hidden !important;
     }
 
-    /* SAĞ SÜTUNLAR (Butonlar) - Sabit ve Küçük */
+    /* BUTONLAR / KATEGORİ (Sağ Sütunlar) - Daralır ama kaybolmaz */
     div[data-testid="column"]:not(:first-child) {
-        flex: 0 0 auto !important; /* İçeriği kadar yer kapla */
-        width: auto !important;
-        min-width: 40px !important; /* Buton için garanti alan */
+        flex: 0 1 auto !important; /* İhtiyacı kadar yer kaplasın */
+        min-width: 40px !important; /* Buton için minimum genişlik */
     }
     
-    /* 4. UZUN YAZILARI KISALT (...) */
+    /* 4. YAZI DÜZENİ (... ile kısaltma) */
     div[data-testid="column"] p, 
     div[data-testid="column"] div, 
     div[data-testid="column"] label {
         white-space: nowrap !important;
         overflow: hidden !important;
-        text-overflow: ellipsis !important; /* Sığmayan yere üç nokta koy */
+        text-overflow: ellipsis !important;
         font-size: 14px !important;
         margin-bottom: 0 !important;
-        line-height: 1.2 !important;
+        width: 100% !important;
     }
     
-    /* 5. BUTONLARI GÜZELLEŞTİR */
+    /* 5. BUTON GÖRÜNÜMÜ (Mobil Uyumlu) */
     button {
-        padding: 0 !important;
+        padding: 0px 8px !important;
         margin: 0 !important;
-        height: 38px !important;
-        min-height: 38px !important;
-        width: 100% !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        width: 100% !important; /* Sütuna tam otur */
+        line-height: 1 !important;
     }
 
-    /* 6. GÖRSEL DÜZELTMELER */
-    .stCheckbox { margin-top: -3px !important; }
-    
-    /* KUTU TASARIMLARI */
+    /* 6. KUTU VE RENKLER */
     .welcome-box {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white; padding: 15px; border-radius: 12px;
@@ -124,6 +119,7 @@ st.markdown("""
     }
     .welcome-title { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
     .category-line { height: 3px; border-radius: 2px; margin-bottom: 5px; }
+    .stCheckbox { margin-top: -2px !important; }
 </style>
 """, unsafe_allow_html=True)
 # YUKARI ÇIK BUTONU
@@ -578,5 +574,6 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
 
 
