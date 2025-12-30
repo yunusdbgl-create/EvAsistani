@@ -28,8 +28,8 @@ st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="cen
 # ==============================================================================
 # 🖼️ CSS VE HEAD (MOBİL UYUM + GÖRSELLİK)
 # ==============================================================================
-APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
-
+st.markdown("""
+<style>
 div[data-testid="stHorizontalBlock"] {
     gap: 0 !important;
     flex-wrap: nowrap !important;
@@ -45,6 +45,9 @@ button {
     height: 36px !important;
     padding: 0 !important;
 }
+</style>
+""", unsafe_allow_html=True)
+
 
 
 # 1. KISIM: HEAD
@@ -616,6 +619,7 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
 
 
 
