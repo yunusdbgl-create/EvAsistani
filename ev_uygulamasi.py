@@ -29,6 +29,55 @@ st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="cen
 # 🖼️ CSS VE HEAD (MOBİL UYUM + GÖRSELLİK)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
+# 🔒 MOBİL KİLİT + SCROLL KORUMA
+st.markdown("""
+<style>
+html, body {
+    overflow-x: hidden !important;
+}
+
+.block-container {
+    max-width: 100vw !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+}
+
+/* TEK SATIR LİSTE */
+.row-line {
+    display: grid;
+    grid-template-columns: 36px 36px 1fr;
+    align-items: center;
+    width: 100%;
+    gap: 0;
+}
+
+.row-line button {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    font-size: 18px;
+}
+
+.row-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# SCROLL KONUMU KORU
+components.html("""
+<script>
+let y = sessionStorage.getItem("scrollY");
+if (y) window.scrollTo(0, y);
+window.addEventListener("scroll", () => {
+    sessionStorage.setItem("scrollY", window.scrollY);
+});
+</script>
+""", height=0)
 
 # 1. KISIM: HEAD
 st.markdown(f"""
@@ -601,6 +650,7 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
 
 
 
