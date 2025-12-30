@@ -39,53 +39,48 @@ st.markdown(f"""
 </head>
 """, unsafe_allow_html=True)
 
-# 2. KISIM: CSS (SAĞLAMLAŞTIRILMIŞ STİL)
+# 2. KISIM: CSS (MENÜLERİ VE BUTONLARI KURTARAN SÜRÜM)
 st.markdown("""
 <style>
-    /* GENEL */
+    /* 1. SAYFA KENAR BOŞLUKLARINI DÜZELT (Menüler geri gelsin) */
     .block-container {
-        padding-left: 2px !important;
-        padding-right: 2px !important;
         padding-top: 1rem !important;
-        max-width: 100vw !important;
-        overflow-x: hidden !important;
+        padding-bottom: 5rem !important;
+        padding-left: 10px !important; /* Soldan biraz boşluk */
+        padding-right: 10px !important; /* Sağdan menü için boşluk */
+        max-width: 100% !important;
     }
     
-    /* MOBİL KİLİT (YAN YANA TUTMA) */
+    /* 2. SATIRLARI HİZALA */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: nowrap !important;
+        flex-wrap: nowrap !important; /* Alt satıra inme yasağı */
         align-items: center !important;
-        gap: 2px !important;
-        width: 100% !important;
+        gap: 5px !important;
     }
     
-    /* SÜTUN YAPISI */
+    /* 3. SÜTUN AYARLARI (Butonlar kaybolmasın) */
     div[data-testid="column"] {
         flex: 1 1 auto !important;
         min-width: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: hidden !important;
+        overflow: hidden !important; /* Taşan yazıyı gizle */
     }
 
-    /* İSİM SÜTUNU (SOL - %70) */
+    /* İsim Sütunu (Sol) */
     div[data-testid="column"]:nth-of-type(1) {
-        flex-grow: 10 !important;
-        overflow: hidden !important;
+        flex-grow: 1 !important;
     }
 
-    /* BUTON SÜTUNLARI (SAĞLAR - SABİT) */
+    /* Buton Sütunları (Orta ve Sağ) - Sabit Genişlik */
     div[data-testid="column"]:nth-last-child(1),
     div[data-testid="column"]:nth-last-child(2) {
-        flex: 0 0 40px !important;
-        width: 40px !important;
-        min-width: 40px !important;
-        max-width: 40px !important;
+        flex: 0 0 auto !important; /* Otomatik sığdır */
+        width: auto !important;
+        min-width: 35px !important; /* En az bu kadar yer kapla */
     }
     
-    /* METİN HİZALAMA */
+    /* 4. METİN DÜZENLEMESİ (... ile kısaltma) */
     div[data-testid="column"] p, 
     div[data-testid="column"] div, 
     div[data-testid="column"] label {
@@ -93,42 +88,37 @@ st.markdown("""
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         font-size: 14px !important;
-        margin: 0 !important;
-        line-height: 1.3 !important;
-        font-weight: 500 !important;
+        margin-bottom: 0 !important;
     }
     
-    /* BUTONLAR */
+    /* 5. BUTON GÖRÜNÜMÜ */
     button {
-        padding: 0 !important;
+        padding: 0px 5px !important; /* İç boşluğu azalttık */
         margin: 0 !important;
-        min-height: 38px !important;
-        height: 38px !important;
+        height: 40px !important;
+        min-height: 40px !important;
         width: 100% !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
+        line-height: 1 !important;
     }
 
-    /* KUTU TASARIMLARI (ESKİ GÜZEL GÖRÜNÜM) */
+    /* 6. EXTRA DÜZELTMELER */
+    .stCheckbox { margin-top: -2px !important; }
+    
+    /* KUTU TASARIMLARI */
     .welcome-box {
-        background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
-        color: #2c3e50; padding: 15px; border-radius: 15px;
-        text-align: center; margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white; padding: 15px; border-radius: 12px;
+        text-align: center; margin-bottom: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
     .prenses-box {
-        background: linear-gradient(120deg, #f6d365 0%, #fda085 100%);
-        color: #5e4a18; padding: 15px; border-radius: 15px;
-        text-align: center; margin-bottom: 20px;
+        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        color: #5e4a18; padding: 15px; border-radius: 12px;
+        text-align: center; margin-bottom: 15px;
         border: 2px solid white;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
-    .category-line { height: 4px; border-radius: 2px; margin-bottom: 10px; margin-top: 5px; }
-    
-    /* Checkbox Düzeltme */
-    .stCheckbox { margin-top: -3px !important; }
+    .welcome-title { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+    .category-line { height: 3px; border-radius: 2px; margin-bottom: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -584,3 +574,4 @@ elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
 elif secim == "🎮 Cihazlar": sayfa_cihazlar()
+
