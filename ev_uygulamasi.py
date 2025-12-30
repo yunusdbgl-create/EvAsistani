@@ -26,7 +26,7 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS (V56 - MOBİL KİLİT SİSTEMİ)
+# 🖼️ CSS (V57 - HATASIZ VE MOBİL KİLİTLİ)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
@@ -37,59 +37,68 @@ st.markdown(f"""
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     </head>
     <style>
-    /* 1. SAYFA GENİŞLİĞİ VE KAYDIRMA ENGELİ */
+    /* 1. SAYFA YAPISI */
     .block-container {{
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
         padding-top: 1rem !important;
+        padding-bottom: 5rem !important;
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
         max-width: 100vw !important;
         overflow-x: hidden !important;
     }}
-    
-    /* 2. SATIRLARI YAN YANA ZORLA (MOBİL DAHİL) */
-    div[data-testid="stHorizontalBlock"] {{
-        display: flex !important;
-        flex-wrap: nowrap !important; /* Asla aşağı inme */
-        align-items: center !important;
-        gap: 4px !important;
-    }}
-    
-    /* 3. MOBİLDE SÜTUNLARI ZORLA YERLEŞTİR */
-    /* İsim Sütunu (1. Sütun) */
-    div[data-testid="column"]:nth-of-type(1) {{
-        flex: 1 !important; /* Kalan tüm boşluğu al */
-        min-width: 0 !important; /* Küçülebildiğin kadar küçül */
-        width: auto !important;
-        overflow: hidden !important;
-    }}
-    
-    /* Düzenle ve Sil Butonları (2. ve 3. Sütun) */
-    div[data-testid="column"]:nth-of-type(2),
-    div[data-testid="column"]:nth-of-type(3) {{
-        flex: 0 0 42px !important; /* Genişliği 42px'e sabitle */
-        width: 42px !important;
-        min-width: 42px !important;
-        padding: 0 !important;
+
+    /* 2. MOBİLDE SÜTUNLARI YAN YANA ZORLA (MEDIA QUERY) */
+    @media (max-width: 640px) {{
+        /* Tüm yatay blokları yan yana tut */
+        div[data-testid="stHorizontalBlock"] {{
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 2px !important;
+            align-items: center !important;
+        }}
+        
+        /* Sütunların genişlemesini engelle */
+        div[data-testid="column"] {{
+            min-width: 0 !important;
+            flex: 1 1 auto !important;
+            width: auto !important;
+        }}
+
+        /* İLK SÜTUN (İsim Kısmı) - Geniş olsun */
+        div[data-testid="column"]:nth-of-type(1) {{
+            flex-grow: 10 !important; /* Fazla yer kapla */
+            overflow: hidden !important;
+        }}
+
+        /* SON İKİ SÜTUN (Butonlar) - Dar olsun */
+        div[data-testid="column"]:nth-last-child(1),
+        div[data-testid="column"]:nth-last-child(2) {{
+            flex-grow: 0 !important;
+            flex-basis: 40px !important;
+            min-width: 40px !important;
+            max-width: 40px !important;
+        }}
     }}
 
-    /* 4. METİN DÜZENLEMESİ (...) */
-    div[data-testid="column"]:nth-of-type(1) div,
-    div[data-testid="column"]:nth-of-type(1) p {{
+    /* 3. METİN AYARLARI (...) */
+    div[data-testid="column"] p, 
+    div[data-testid="column"] div {{
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         font-size: 14px !important;
         margin: 0 !important;
-        line-height: 40px !important; /* Dikey ortala */
     }}
-    
-    /* 5. BUTON STİLİ */
+
+    /* 4. BUTONLARI SIKIŞTIR */
     button {{
         padding: 0 !important;
         margin: 0 !important;
         height: 38px !important;
-        width: 100% !important;
         min-height: 38px !important;
+        width: 100% !important;
+        line-height: 1 !important;
     }}
 
     /* KUTU TASARIMLARI */
@@ -129,7 +138,7 @@ def ask_kavanozu_sozleri():
     return ["Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", "Akşam çayı benden!", "Seni seviyorum!", "Harika bir eşsin.", "Evin neşesi sensin.", "Sen benim şansımsın."]
 
 def prenses_sozleri():
-    return ["🐈 Prenses: Mama kabım boş!", "🐈 Prenses: O koltuk benim.", "🐈 Prenses: Beni sevin!", "🐈 Prenses: Akşama balık mı var?", "🐈 Prenses: Miyav!"]
+    return ["🐈 Prenses: Mama kabım boş!", "🐈 Prenses: O koltuk benim.", "🐈 Prenses: Beni sevin!", "🐈 Prenses: Akşama balık mı var?", "🐈 Prenses: Miyav!", "🐈 Prenses: Uyuyorum, ses yapmayın.", "🐈 Prenses: Kutular neden bu kadar güzel?"]
 
 # ==============================================================================
 # 🔄 VERİTABANI
@@ -295,7 +304,7 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# LİSTELEME (ÇİVİ GİBİ SABİT)
+# LİSTELEME MODÜLÜ (ÇİVİ GİBİ SABİT)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
@@ -305,9 +314,8 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
             if c1.form_submit_button("💾"): hizli_duzenle(row['Urun'], yeni); st.session_state[f"editing_{prefix}"] = None; st.rerun()
             if c2.form_submit_button("❌"): st.session_state[f"editing_{prefix}"] = None; st.rerun()
     else:
-        # PİKSEL TABANLI HİZALAMA İÇİN ÖZEL ORANLAR (CSS İLE SABİTLENDİ)
-        # Streamlit oranlarını biraz esnek bırakıyoruz, CSS bunları 42px'e zorlayacak
-        c1, c2, c3 = st.columns([0.8, 0.1, 0.1], gap="small", vertical_alignment="center")
+        # PİKSEL TABANLI HİZALAMA İÇİN ORANLAR (CSS ile sıkışacaklar)
+        c1, c2, c3 = st.columns([0.7, 0.15, 0.15], gap="small", vertical_alignment="center")
         with c1:
             if checkbox_var:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
@@ -321,7 +329,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"): hizli_sil(row['Urun']); st.session_state[f"conf_{prefix}_{i}"] = False; st.rerun()
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.8, 0.1, 0.1], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.7, 0.15, 0.15], gap="small", vertical_alignment="center")
     with c1:
         if st.button(f"➕ {row['Urun']}", key=f"back_{prefix}_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
     with c2:
@@ -399,7 +407,7 @@ def sayfa_ekonomi():
             with c1: st.radio("Tip", ["Gider", "Gelir"], horizontal=True, key="butce_tur"); st.text_input("Açıklama", key="butce_ad")
             with c2: st.number_input("Tutar", key="butce_tutar"); st.button("KAYDET", key="btn_butce", on_click=butce_callback)
         st.markdown("---"); df_b = st.session_state.local_df[st.session_state.local_df["Tip"] == "BUTCE"]; 
-        bu_ay = datetime.now().strftime("%Y-%m"); df_b = df_b[df_b["Durum"].str.contains("Gelir|Gider", na=False)] # Basit filtre
+        bu_ay = datetime.now().strftime("%Y-%m"); df_b = df_b[df_b["Durum"].str.contains("Gelir|Gider", na=False)] 
         for i, row in df_b.iterrows():
              c1, c2, c3 = st.columns([0.8, 0.1, 0.1], gap="small", vertical_alignment="center")
              with c1: st.write(f"{row['Urun']} - {row['Mesaj']}₺")
