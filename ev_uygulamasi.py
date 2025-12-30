@@ -26,7 +26,7 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
 # ==============================================================================
-# 🖼️ CSS (V57 - HATASIZ VE MOBİL KİLİTLİ)
+# 🖼️ CSS (V58 - DÜZELTİLMİŞ VE KİLİTLİ)
 # ==============================================================================
 APP_ICON_URL = "https://cdn-icons-png.flaticon.com/512/2942/2942789.png"
 
@@ -46,42 +46,37 @@ st.markdown(f"""
         max-width: 100vw !important;
         overflow-x: hidden !important;
     }}
-
-    /* 2. MOBİLDE SÜTUNLARI YAN YANA ZORLA (MEDIA QUERY) */
+    
+    /* 2. SATIR YAPISI (MOBİL DAHİL YAN YANA) */
+    div[data-testid="stHorizontalBlock"] {{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 2px !important;
+    }}
+    
+    /* 3. MOBİL İÇİN SÜTUN GENİŞLİKLERİ */
     @media (max-width: 640px) {{
-        /* Tüm yatay blokları yan yana tut */
-        div[data-testid="stHorizontalBlock"] {{
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            gap: 2px !important;
-            align-items: center !important;
-        }}
-        
-        /* Sütunların genişlemesini engelle */
-        div[data-testid="column"] {{
-            min-width: 0 !important;
-            flex: 1 1 auto !important;
-            width: auto !important;
-        }}
-
-        /* İLK SÜTUN (İsim Kısmı) - Geniş olsun */
+        /* İsim Sütunu (En soldaki) - Esnek */
         div[data-testid="column"]:nth-of-type(1) {{
-            flex-grow: 10 !important; /* Fazla yer kapla */
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            width: auto !important;
             overflow: hidden !important;
         }}
-
-        /* SON İKİ SÜTUN (Butonlar) - Dar olsun */
-        div[data-testid="column"]:nth-last-child(1),
-        div[data-testid="column"]:nth-last-child(2) {{
-            flex-grow: 0 !important;
-            flex-basis: 40px !important;
-            min-width: 40px !important;
-            max-width: 40px !important;
+        
+        /* Buton Sütunları (Ortadaki ve Sağdaki) - Sabit */
+        div[data-testid="column"]:nth-of-type(2),
+        div[data-testid="column"]:nth-of-type(3) {{
+            flex: 0 0 38px !important; /* Sabit 38px genişlik */
+            width: 38px !important;
+            min-width: 38px !important;
+            padding: 0 !important;
         }}
     }}
 
-    /* 3. METİN AYARLARI (...) */
+    /* 4. METİN DÜZENLEMESİ (...) */
     div[data-testid="column"] p, 
     div[data-testid="column"] div {{
         white-space: nowrap !important;
@@ -90,15 +85,24 @@ st.markdown(f"""
         font-size: 14px !important;
         margin: 0 !important;
     }}
-
-    /* 4. BUTONLARI SIKIŞTIR */
+    
+    /* 5. BUTON STİLİ */
     button {{
         padding: 0 !important;
         margin: 0 !important;
-        height: 38px !important;
         min-height: 38px !important;
+        height: 38px !important;
         width: 100% !important;
         line-height: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }}
+    
+    /* 6. Checkbox Hizalama */
+    .stCheckbox {{
+        margin-top: 0px !important;
+        padding-top: 0px !important;
     }}
 
     /* KUTU TASARIMLARI */
@@ -115,6 +119,7 @@ st.markdown(f"""
         border: 2px solid white;
     }}
     .welcome-title {{ font-size: 20px; font-weight: bold; margin-bottom: 5px; }}
+    .welcome-note {{ font-size: 14px; font-style: italic; opacity: 0.9; }}
     .category-line {{ height: 3px; border-radius: 2px; margin-bottom: 5px; }}
     </style>
 """, unsafe_allow_html=True)
@@ -126,7 +131,7 @@ components.html("""
 """, height=0)
 
 # ==============================================================================
-# 🧠 İÇERİK
+# 🧠 İÇERİK KÜTÜPHANESİ
 # ==============================================================================
 def get_kategori_renk(kategori):
     renkler = {"Meyve": "#2ecc71", "Sebze": "#27ae60", "Manav": "#2ecc71", "Et": "#c0392b", "Süt": "#3498db", "Temizlik": "#8e44ad", "Gıda": "#e67e22", "Abur Cubur": "#e84393", "İçecek": "#00cec9", "Genel": "#95a5a6"}
@@ -138,10 +143,10 @@ def ask_kavanozu_sozleri():
     return ["Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", "Akşam çayı benden!", "Seni seviyorum!", "Harika bir eşsin.", "Evin neşesi sensin.", "Sen benim şansımsın."]
 
 def prenses_sozleri():
-    return ["🐈 Prenses: Mama kabım boş!", "🐈 Prenses: O koltuk benim.", "🐈 Prenses: Beni sevin!", "🐈 Prenses: Akşama balık mı var?", "🐈 Prenses: Miyav!", "🐈 Prenses: Uyuyorum, ses yapmayın.", "🐈 Prenses: Kutular neden bu kadar güzel?"]
+    return ["🐈 Prenses: Mama kabım boş!", "🐈 Prenses: O koltuk benim.", "🐈 Prenses: Beni sevmeyi unuttunuz mu?", "🐈 Prenses: Akşama balık mı var?", "🐈 Prenses: Miyav!", "🐈 Prenses: Uyuyorum, ses yapmayın.", "🐈 Prenses: Kutular neden bu kadar güzel?"]
 
 # ==============================================================================
-# 🔄 VERİTABANI
+# 🔄 VERİTABANI İŞLEMLERİ
 # ==============================================================================
 def get_client():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -304,18 +309,18 @@ def dashboard_goster():
     st.markdown("---")
 
 # ==============================================================================
-# LİSTELEME MODÜLÜ (ÇİVİ GİBİ SABİT)
+# V57: LİSTELEME MODÜLÜ (MOBİL KİLİTLİ)
 # ==============================================================================
 def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
     if st.session_state.get(f"editing_{prefix}") == row['Urun']:
         with st.form(key=f"edit_form_{prefix}_{i}"):
-            yeni = st.text_input("Dzn:", value=row['Urun'])
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("💾"): hizli_duzenle(row['Urun'], yeni); st.session_state[f"editing_{prefix}"] = None; st.rerun()
-            if c2.form_submit_button("❌"): st.session_state[f"editing_{prefix}"] = None; st.rerun()
+            yeni_ad = st.text_input("Düzenle:", value=row['Urun'])
+            c_save, c_cancel = st.columns(2)
+            if c_save.form_submit_button("💾"): hizli_duzenle(row['Urun'], yeni_ad); st.session_state[f"editing_{prefix}"] = None; st.rerun()
+            if c_cancel.form_submit_button("❌"): st.session_state[f"editing_{prefix}"] = None; st.rerun()
     else:
-        # PİKSEL TABANLI HİZALAMA İÇİN ORANLAR (CSS ile sıkışacaklar)
-        c1, c2, c3 = st.columns([0.7, 0.15, 0.15], gap="small", vertical_alignment="center")
+        # SÜTUN ORANLARI: %60 - %20 - %20 (CSS'te de sabitlendi)
+        c1, c2, c3 = st.columns([0.60, 0.20, 0.20], gap="small", vertical_alignment="center")
         with c1:
             if checkbox_var:
                 if st.checkbox(f"**{row['Urun']}**", key=f"chk_{prefix}_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
@@ -329,7 +334,7 @@ def liste_satiri_olustur(prefix, i, row, checkbox_var=True):
                 if st.button("Sil?", key=f"yes_{prefix}_{i}", type="primary"): hizli_sil(row['Urun']); st.session_state[f"conf_{prefix}_{i}"] = False; st.rerun()
 
 def liste_satiri_geri_al(prefix, i, row):
-    c1, c2, c3 = st.columns([0.7, 0.15, 0.15], gap="small", vertical_alignment="center")
+    c1, c2, c3 = st.columns([0.60, 0.20, 0.20], gap="small", vertical_alignment="center")
     with c1:
         if st.button(f"➕ {row['Urun']}", key=f"back_{prefix}_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
     with c2:
@@ -459,11 +464,12 @@ def sayfa_yemekler():
 def sayfa_yasam():
     tab1, tab2, tab3 = st.tabs(["⛓️ ZİNCİR", "⏳ SAYAÇ", "📒 NOTLAR"])
     with tab1:
-        c1, c2 = st.columns([0.8, 0.2]); 
-        with c1: st.text_input("Rutin", key="rutin_giris", label_visibility="collapsed")
-        with c2: st.button("EKLE", key="btn_rutin", on_click=rutin_ekle_callback)
-        df_r = st.session_state.local_df[st.session_state.local_df["Tip"] == "RUTIN"]; st.markdown("---")
-        for i, row in df_r.iterrows(): liste_satiri_olustur("r", i, row)
+        st.caption("Zinciri kırma!"); c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
+        with c1: st.text_input("Rutin", key="rutin_giris", label_visibility="collapsed", placeholder="Su...")
+        with c2: st.button("EKLE", key="btn_rutin", on_click=rutin_ekle_callback, use_container_width=True)
+        df_r = st.session_state.local_df[st.session_state.local_df["Tip"] == "RUTIN"]; completed = len(df_r[df_r["Durum"] == "1"])
+        if len(df_r) > 0: st.progress(completed/len(df_r), text=f"İlerleme: %{int((completed/len(df_r))*100)}")
+        st.markdown("---"); [liste_satiri_olustur("r", i, row) for i, row in df_r.iterrows()]
     with tab2:
         with st.expander("➕ Ekle"): st.text_input("Ad", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih"); st.button("KAYDET", key="btn_syc", on_click=sayac_callback)
         df_s = st.session_state.local_df[st.session_state.local_df["Tip"] == "COUNTDOWN"]; st.markdown("---")
@@ -484,7 +490,7 @@ def sayfa_dosya():
     if d: import img2pdf; st.download_button("⬇️", img2pdf.convert(d.read()), f"{d.name}.pdf", "application/pdf")
 
 def sayfa_cihazlar():
-    st.info("Yapım Aşamasında")
+    st.markdown("### 🎮 Akıllı Ev"); st.info("Geliştirme Modunda")
 
 # ==============================================================================
 # ÇALIŞTIRMA
