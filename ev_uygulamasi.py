@@ -41,7 +41,7 @@ st.markdown("""
     div[data-testid="column"] { display: flex; align-items: center; height: 100%; }
     button { padding: 0.25rem 0.5rem !important; }
 
-    /* MOBILE FIRST */
+/* ================= MOBILE FIRST ================= */
 * {
     box-sizing: border-box;
 }
@@ -56,15 +56,21 @@ input, textarea, select {
     font-size: 16px !important;
 }
 
-/* Checkbox dokunmatik */
 input[type="checkbox"] {
     transform: scale(1.3);
 }
 
-/* Expander dokunma alanı */
 .streamlit-expanderHeader {
     padding: 12px !important;
 }
+
+/* Mobilde yatay taşmayı kapat */
+@media (max-width: 768px) {
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+    }
+}
+
 
     
     /* Karşılama Kutusu */
@@ -744,6 +750,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
