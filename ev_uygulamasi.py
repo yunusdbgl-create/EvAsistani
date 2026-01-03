@@ -412,7 +412,7 @@ def sayfa_ana_ekran():
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
                     st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
                     for i, row in items.iterrows():
-                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                        c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
                         with c1:
                             if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
                         with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
@@ -428,7 +428,7 @@ def sayfa_ana_ekran():
                     if not items.empty:
                         with st.expander(f"{kat} ({len(items)})"):
                             for i, row in items.iterrows():
-                                c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                                c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
                                 with c1:
                                     if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
                                 with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
@@ -456,7 +456,7 @@ def sayfa_ana_ekran():
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
                     st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
                     for i, row in items.iterrows():
-                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                        c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
                         with c1:
                             if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
                         with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
@@ -595,7 +595,7 @@ def sayfa_yemekler():
             if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_kahvalti", type="primary", use_container_width=True):
                 st.balloons(); st.success(f"🍳 Kahvaltı: **{random.choice(havuz)}**")
         for i, row in df_k.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+            c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
             with c1:
                 chk = (row['Durum'] == "1")
                 if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"k_chk_{i}"):
@@ -615,7 +615,7 @@ def sayfa_yemekler():
             if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_yemek", type="primary", use_container_width=True):
                 st.balloons(); st.success(f"🥘 Akşam Yemeği: **{random.choice(havuz)}**")
         for i, row in df_y.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+            c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
             with c1:
                 chk = (row['Durum'] == "1")
                 if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"y_chk_{i}"):
@@ -655,7 +655,7 @@ def sayfa_yasam():
         if len(df_r) > 0: st.progress(completed/len(df_r), text=f"Günlük İlerleme: %{int((completed/len(df_r))*100)}")
         st.markdown("---")
         for i, row in df_r.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+            c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
             with c1:
                 is_done = (row['Durum'] == "1")
                 if st.checkbox(f"**{row['Urun']}**", value=is_done, key=f"r_chk_{i}"):
@@ -674,7 +674,7 @@ def sayfa_yasam():
             for i, row in df_s.iterrows():
                 try:
                     hedef = datetime.strptime(row["Zaman"], "%Y-%m-%d").date(); kalan = (hedef - bugun).days
-                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+                    c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
                     with c1: st.write(f"🎉 **{row['Urun']}**"); st.info(f"⏳ **{kalan}** gün kaldı") if kalan > 0 else st.success("🎉 BUGÜN!")
                     with c2: silme_butonu_koy(f"syc_{i}", row['Urun'])
                     st.divider()
@@ -711,4 +711,5 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
