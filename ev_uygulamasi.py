@@ -497,7 +497,7 @@ with c2:
     silme_butonu_koy(f"m_{i}", row["Urun"])
 
 
-        st.divider()
+st.divider()
         tamamlananlar = df_market[df_market["Durum"] == "1"]
         with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
             if tamamlananlar.empty: st.info("Geçmiş boş.")
@@ -808,6 +808,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
