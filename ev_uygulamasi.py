@@ -735,6 +735,23 @@ def sayfa_dosya():
 # ==============================================================================
 # ÇALIŞTIRMA
 # ==============================================================================
+st.markdown("""
+<style>
+.app-header {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 999;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+</style>
+
+<div class="app-header">
+    <h3>🏡 Bizim Ev</h3>
+</div>
+""", unsafe_allow_html=True)
+
 karsilama_paneli()
 dashboard_goster()
 
@@ -750,6 +767,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
