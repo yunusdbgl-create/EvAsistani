@@ -94,6 +94,30 @@ input[type="checkbox"] {
         color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
     }
     .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
+    .inline-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+}
+
+.inline-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.inline-left label {
+    margin-bottom: 0 !important;
+}
+
+.inline-right button {
+    padding: 4px 8px !important;
+    min-height: unset !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -449,12 +473,29 @@ def sayfa_ana_ekran():
             if not items.empty:
                 renk = get_kategori_renk(kat)
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
-                    for i, row in items.iterrows():
-                        c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small")
-                        with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
+                    st.markdown(
+    f"""
+    <div class="inline-item">
+        <div class="inline-left">
+            <span>{row['Urun']}</span>
+        </div>
+        <div class="inline-right">
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+c1, c2 = st.columns([0.85, 0.15])
+with c1:
+    checked = st.checkbox(" ", key=f"chk_m_{i}", label_visibility="collapsed")
+    if checked:
+        hizli_durum_degistir(row["Urun"], "1")
+        st.rerun()
+
+with c2:
+    silme_butonu_koy(f"m_{i}", row["Urun"])
+
 
         st.divider()
         tamamlananlar = df_market[df_market["Durum"] == "1"]
@@ -767,6 +808,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
