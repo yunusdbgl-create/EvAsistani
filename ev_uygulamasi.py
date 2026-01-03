@@ -452,9 +452,6 @@ def sayfa_ana_ekran():
                     st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
                     for i, row in items.iterrows():
                         c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small")
-                        st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
-st.selectbox("Kategori", TUM_KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
-st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
                         with c1:
                             if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
                         with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
@@ -770,6 +767,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
