@@ -498,20 +498,37 @@ with c2:
 
 
 st.divider()
-        tamamlananlar = df_market[df_market["Durum"] == "1"]
-        with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
-            if tamamlananlar.empty: st.info("Geçmiş boş.")
+
+tamamlananlar = df_market[df_market["Durum"] == "1"]
+with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
+    if tamamlananlar.empty:
+        st.info("Geçmiş boş.")
+    else:
+        for kat in kategori_listesi:
+            if kat == "Genel":
+                items = tamamlananlar[
+                    (tamamlananlar["Mesaj"] == "") |
+                    (tamamlananlar["Mesaj"] == "Genel") |
+                    (tamamlananlar["Mesaj"] == "None")
+                ]
             else:
-                for kat in kategori_listesi:
-                    if kat == "Genel": items = tamamlananlar[(tamamlananlar["Mesaj"] == "") | (tamamlananlar["Mesaj"] == "Genel") | (tamamlananlar["Mesaj"] == "None")]
-                    else: items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
-                    if not items.empty:
-                        with st.expander(f"{kat} ({len(items)})"):
-                            for i, row in items.iterrows():
-                                c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
-                                with c1:
-                                    if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
-                                with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
+                items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
+
+            if not items.empty:
+                with st.expander(f"{kat} ({len(items)})"):
+                    for i, row in items.iterrows():
+                        c1, c2 = st.columns([0.7, 0.3], gap="small", vertical_alignment="center")
+                        with c1:
+                            if st.button(
+                                f"➕ {row['Urun']}",
+                                key=f"back_m_{i}",
+                                use_container_width=True
+                            ):
+                                hizli_durum_degistir(row['Urun'], "0")
+                                st.rerun()
+                        with c2:
+                            silme_butonu_koy(f"fin_m_{i}", row['Urun'])
+
 
     with tab2:
         df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
@@ -808,6 +825,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
