@@ -34,6 +34,32 @@ st.markdown("""
 
     div[data-testid="column"] { display: flex; align-items: center; height: 100%; }
     button { padding: 0.25rem 0.5rem !important; }
+
+    /* MOBILE FIRST */
+* {
+    box-sizing: border-box;
+}
+
+button {
+    width: 100% !important;
+    min-height: 44px;
+    font-size: 16px !important;
+}
+
+input, textarea, select {
+    font-size: 16px !important;
+}
+
+/* Checkbox dokunmatik */
+input[type="checkbox"] {
+    transform: scale(1.3);
+}
+
+/* Expander dokunma alanı */
+.streamlit-expanderHeader {
+    padding: 12px !important;
+}
+
     
     /* Karşılama Kutusu */
     .welcome-box {
@@ -712,6 +738,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
