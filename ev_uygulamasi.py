@@ -21,7 +21,13 @@ except ImportError:
 DOSYA_ADI = "EvAsistaniDB"
 NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
-st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered",initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Bizim Evin Paneli",
+    page_icon="🏡",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
 
 # --- CSS ---
 st.markdown("""
@@ -738,6 +744,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
