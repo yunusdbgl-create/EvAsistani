@@ -58,6 +58,15 @@ st.markdown("""
     .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
 </style>
 """, unsafe_allow_html=True)
+.link-box {
+    display: block;
+    padding: 8px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    background: #f5f5f5;
+    text-align: center;
+}
+
 
 # KATEGORİ RENK HARİTASI
 def get_kategori_renk(kategori):
@@ -711,5 +720,6 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
