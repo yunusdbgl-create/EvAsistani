@@ -755,18 +755,19 @@ st.markdown("""
 karsilama_paneli()
 dashboard_goster()
 
-st.markdown("<hr>", unsafe_allow_html=True)
-secim = st.radio(
-    "",
-    ["🏠", "🍽️", "💰", "🧬", "📂"],
-    horizontal=True
-)
+with st.sidebar:
+    st.header("Menü")
+    secim = st.radio("Git:", ["🏠 Ana Sayfa", "🍽️ Yemekler", "💰 Ekonomi", "🧬 Yaşam", "📂 Dosya"])
+    st.markdown("---"); st.header("Linkler")
+    st.markdown('<a href="https://www.turkiye.gov.tr/" target="_blank" class="link-box">🏛️ E-Devlet</a>', unsafe_allow_html=True)
+    st.markdown('<a href="https://www.enabiz.gov.tr/" target="_blank" class="link-box">🏥 E-Nabız</a>', unsafe_allow_html=True)
 
 if secim == "🏠 Ana Sayfa": sayfa_ana_ekran()
 elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
