@@ -403,18 +403,38 @@ def sayfa_ana_ekran():
             + ["✏️ Yeni Kategori Yaz"]
         )
 
-        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
-        with c1:
-            st.text_input("Ürün", key="market_giris", placeholder="Ürün Adı...", label_visibility="collapsed")
-        with c2:
-            st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
-
-        st.selectbox("Kategori", TUM_KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
-
-        if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
-            st.text_input("Yeni Kategori Adı", key="market_kategori_yeni")
-
-        st.markdown("---")
+    # ======================
+    # ÜRÜN EKLEME (ALT ALTA - MOBİL UYUMLU)
+    # ======================
+    st.text_input(
+        "Ürün",
+        key="market_giris",
+        placeholder="Ürün Adı...",
+        label_visibility="collapsed"
+    )
+    
+    st.selectbox(
+        "Kategori",
+        TUM_KATEGORILER,
+        key="market_kategori_secim",
+        label_visibility="collapsed"
+    )
+    
+    if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
+        st.text_input(
+            "Yeni Kategori Adı",
+            key="market_kategori_yeni",
+            placeholder="Örn: Tekne"
+        )
+    
+    st.button(
+        "EKLE",
+        key="btn_m",
+        on_click=market_ekleme_callback,
+        use_container_width=True
+    )
+    
+    st.markdown("---")
 
         alinacaklar = df_market[df_market["Durum"] == "0"]
         st.subheader("📌 Alınacaklar Listesi")
@@ -749,6 +769,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
