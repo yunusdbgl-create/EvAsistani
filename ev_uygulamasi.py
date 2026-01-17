@@ -337,13 +337,15 @@ def silme_butonu_koy(prefix, urun):
 # ==============================================================================
 def dashboard_goster():
     df = st.session_state.local_df
-    
+
     # Sıradaki Fatura
     df_f = df[df["Tip"] == "FATURA"]
-    siradaki_fatura = "Yok"; kalan_gun_txt = ""
+    siradaki_fatura = "Yok"
+    kalan_gun_txt = ""
+
     if not df_f.empty:
         bugun = datetime.now().day
-        df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32)
+        df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors="coerce").fillna(32)
         df_f = df_f.sort_values("Gun_Sayi")
         for _, row in df_f.iterrows():
             kalan = int(row["Gun_Sayi"]) - bugun
@@ -351,13 +353,14 @@ def dashboard_goster():
                 siradaki_fatura = row["Urun"]
                 kalan_gun_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
                 break
-    
-# Market Sepeti
-sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
 
-st.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
-st.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
-st.markdown("---")
+    # 🛒 Market Sepeti
+    sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
+
+    st.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
+    st.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
+    st.markdown("---")
+
 
 # ==============================================================================
 # SAYFALAR
@@ -746,6 +749,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
