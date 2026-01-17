@@ -352,10 +352,9 @@ def dashboard_goster():
                 kalan_gun_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
                 break
     
-    # Market Sepeti
-    sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
+# Market Sepeti
+sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
 
-    c1, c2 = st.columns(2)
 st.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
 st.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
 st.markdown("---")
@@ -747,6 +746,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
