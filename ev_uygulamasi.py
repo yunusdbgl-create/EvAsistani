@@ -395,9 +395,9 @@ st.selectbox(
     label_visibility="collapsed"
 )
 
-        
 if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
         st.text_input("Yeni Kategori Adı:", key="market_kategori_yeni", placeholder="Örn: Tekne")
+
 st.markdown("---")
         
         alinacaklar = df_market[df_market["Durum"] == "0"]
@@ -715,5 +715,6 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
