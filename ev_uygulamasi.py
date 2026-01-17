@@ -524,39 +524,39 @@ def sayfa_ana_ekran():
 
         # --- İŞ EKLEME (MOBİL UYUMLU) ---
 
-# 1️⃣ İş adı (üst satır)
-st.text_input(
-    "Görev",
-    key="is_giris",
-    label_visibility="collapsed",
-    placeholder="Yapılacak iş..."
-)
-
-# 2️⃣ Kategori (alt satır)
-st.selectbox(
-    "Kategori",
-    TUM_ISLER,
-    key="is_kategori_secim",
-    label_visibility="collapsed"
-)
-
-# Yeni kategori yazımı
-if st.session_state.is_kategori_secim == "✏️ Yeni Kategori Yaz":
+    # 1️⃣ İş adı (üst satır)
     st.text_input(
-        "Yeni Kategori Adı:",
-        key="is_kategori_yeni",
-        placeholder="Örn: Bahçe"
+        "Görev",
+        key="is_giris",
+        label_visibility="collapsed",
+        placeholder="Yapılacak iş..."
     )
-
-# 3️⃣ EKLE butonu (en alt – tam genişlik)
-st.button(
-    "EKLE",
-    key="btn_t",
-    on_click=is_ekleme_callback,
-    use_container_width=True
-)
-
-st.markdown("---")
+    
+    # 2️⃣ Kategori (alt satır)
+    st.selectbox(
+        "Kategori",
+        TUM_ISLER,
+        key="is_kategori_secim",
+        label_visibility="collapsed"
+    )
+    
+    # Yeni kategori yazımı
+    if st.session_state.is_kategori_secim == "✏️ Yeni Kategori Yaz":
+        st.text_input(
+            "Yeni Kategori Adı:",
+            key="is_kategori_yeni",
+            placeholder="Örn: Bahçe"
+        )
+    
+    # 3️⃣ EKLE butonu (en alt – tam genişlik)
+    st.button(
+        "EKLE",
+        key="btn_t",
+        on_click=is_ekleme_callback,
+        use_container_width=True
+    )
+    
+    st.markdown("---")
 
         is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
         if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
@@ -824,6 +824,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
