@@ -373,34 +373,64 @@ def sayfa_ana_ekran():
 
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
     
-    with tab1:
-        df = st.session_state.local_df
-        df_market = df[df["Tip"] == "MARKET"]
-        
-        VARSAYILAN_KATEGORILER = ["🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt & Kahvaltılık", "🍞 Gıda & Bakliyat", "🧹 Temizlik", "🍫 Atıştırmalık"]
-        kayitli_kategoriler = {k for k in set(df_market["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]}
-        TUM_KATEGORILER = sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler)) + ["✏️ Yeni Kategori Yaz"]
-        
-c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
-with c1:
-    st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
-with c2:
-    st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
+with tab1:
+    df = st.session_state.local_df
+    df_market = df[df["Tip"] == "MARKET"]
 
-# 👇 ALT SATIR
-st.selectbox(
-    "Kategori",
-    TUM_KATEGORILER,
-    key="market_kategori_secim",
-    label_visibility="collapsed"
-)
+    VARSAYILAN_KATEGORILER = [
+        "🍏 Meyve & Sebze",
+        "🥩 Et & Şarküteri",
+        "🥛 Süt & Kahvaltılık",
+        "🍞 Gıda & Bakliyat",
+        "🧹 Temizlik",
+        "🍫 Atıştırmalık"
+    ]
 
-if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
-        st.text_input("Yeni Kategori Adı:", key="market_kategori_yeni", placeholder="Örn: Tekne")
+    kayitli_kategoriler = {
+        k for k in set(df_market["Mesaj"].dropna().unique())
+        if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]
+    }
 
-st.markdown("---")
-        
-        alinacaklar = df_market[df_market["Durum"] == "0"]
+    TUM_KATEGORILER = (
+        sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler))
+        + ["✏️ Yeni Kategori Yaz"]
+    )
+
+    # --- ÜRÜN EKLEME ---
+    c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
+    with c1:
+        st.text_input(
+            "Ürün",
+            key="market_giris",
+            label_visibility="collapsed",
+            placeholder="Ürün Adı..."
+        )
+    with c2:
+        st.button(
+            "EKLE",
+            key="btn_m",
+            on_click=market_ekleme_callback,
+            use_container_width=True
+        )
+
+    st.selectbox(
+        "Kategori",
+        TUM_KATEGORILER,
+        key="market_kategori_secim",
+        label_visibility="collapsed"
+    )
+
+    if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
+        st.text_input(
+            "Yeni Kategori Adı:",
+            key="market_kategori_yeni",
+            placeholder="Örn: Tekne"
+        )
+
+    st.markdown("---")
+
+    # --- ALINACAKLAR ---
+    alinacaklar = df_market[df_market["Durum"] == "0"]
         st.subheader("📌 Alınacaklar Listesi")
         if alinacaklar.empty: st.success("Sepet Boş! 🎉")
         
@@ -715,6 +745,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
