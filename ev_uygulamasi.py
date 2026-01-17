@@ -1,118 +1,133 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
-import requests
 import time
 from datetime import datetime, timedelta, time as dt_time
-import threading
 import random
+import threading
 
-# Grafik kütüphanesini güvenli içe aktarma
+# ==============================================================================
+# ⚙️ AYARLAR VE YAPILANDIRMA
+# ==============================================================================
+st.set_page_config(
+    page_title="Ev Asistanı Pro",
+    page_icon="🏡",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+DOSYA_ADI = "EvAsistaniDB"
+NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
+
+# Kütüphane Kontrolleri
 try:
     import plotly.express as px
     GRAFIK_VAR = True
 except ImportError:
     GRAFIK_VAR = False
 
-# ==============================================================================
-# AYARLAR
-# ==============================================================================
-DOSYA_ADI = "EvAsistaniDB"
-NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
+try:
+    import img2pdf
+    PDF_VAR = True
+except ImportError:
+    PDF_VAR = False
 
-st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
-
-# --- CSS ---
+# ==============================================================================
+# 🎨 MODERN UI STİLLERİ (CSS)
+# ==============================================================================
 st.markdown("""
 <style>
-    div[data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 5px !important; }
-    div[data-testid="column"] { display: flex; align-items: center; height: 100%; }
-    button { padding: 0.25rem 0.5rem !important; }
-    
-    /* Karşılama Kutusu */
+    .stApp { background-color: #f8f9fa; }
+    div.css-1r6slb0, div.stExpander {
+        background: white; border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 10px; border: 1px solid #e9ecef;
+    }
+    button[kind="primary"] {
+        background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
+        border: none; transition: all 0.3s ease;
+    }
+    button[kind="primary"]:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
     .welcome-box {
-        background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
-        color: #2c3e50; padding: 15px; border-radius: 15px;
-        text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white; padding: 20px; border-radius: 20px; text-align: center; margin-bottom: 25px;
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
     }
     .prenses-box {
-        background: linear-gradient(120deg, #fccb90 0%, #d57eeb 100%);
-        color: #4a235a; padding: 15px; border-radius: 15px;
-        text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        border: 2px solid #fff;
+        background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+        color: #5e2d48; padding: 20px; border-radius: 20px; text-align: center; margin-bottom: 25px;
+        border: 2px solid white; box-shadow: 0 10px 20px rgba(255, 154, 158, 0.3);
     }
-    .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
-    .welcome-note { font-size: 15px; font-style: italic; }
-    
-    /* Kategori Rozetleri */
-    .cat-badge {
-        display: inline-block; padding: 4px 12px; border-radius: 12px;
-        color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
+    .welcome-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+    .welcome-note { font-size: 16px; font-style: italic; opacity: 0.9; }
+    .category-line { height: 4px; border-radius: 2px; margin-bottom: 12px; }
+    div[data-testid="column"] { gap: 10px; }
+    .metric-card {
+        background-color: white; padding: 15px; border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; border: 1px solid #eee;
     }
-    .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
 </style>
 """, unsafe_allow_html=True)
 
-# KATEGORİ RENK HARİTASI
+# ==============================================================================
+# 🔌 VERİTABANI BAĞLANTISI
+# ==============================================================================
+@st.cache_resource
+def get_gspread_client():
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(dict(st.secrets["connections"]["gsheets"]), scopes=scopes)
+        return gspread.authorize(creds), True
+    except Exception as e:
+        return None, False
+
+gc, ONLINE_MOD = get_gspread_client()
+
+def veri_senkronize_et(df, islem_tipi, veri=None):
+    if not ONLINE_MOD: return
+    def thread_gorevi():
+        try:
+            sheet = gc.open(DOSYA_ADI).sheet1
+            if islem_tipi == "ekle": sheet.append_row(veri)
+            elif islem_tipi == "sil":
+                try:
+                    cell = sheet.find(veri)
+                    sheet.delete_rows(cell.row)
+                except: pass
+            elif islem_tipi == "guncelle":
+                try:
+                    cell = sheet.find(veri[0])
+                    sheet.update_cell(cell.row, 2, str(veri[1]))
+                except: pass
+        except Exception as e: print(f"Sync Hatası: {e}")
+    threading.Thread(target=thread_gorevi).start()
+
+def verileri_yukle():
+    cols = ["Urun", "Durum", "Mesaj", "Zaman", "Tip"]
+    if ONLINE_MOD:
+        try:
+            data = gc.open(DOSYA_ADI).sheet1.get_all_values()
+            if len(data) > 1:
+                df = pd.DataFrame(data[1:], columns=data[0]).astype(str)
+                for col in cols: 
+                    if col not in df.columns: df[col] = ""
+                return df
+        except: pass
+    return pd.DataFrame(columns=cols)
+
+if 'local_df' not in st.session_state:
+    st.session_state.local_df = verileri_yukle()
+    if not ONLINE_MOD: st.warning("⚠️ Offline Mod: Değişiklikler kaydedilmeyecek.")
+
+# ==============================================================================
+# 🧠 YARDIMCI FONKSİYONLAR & AI MOTORU
+# ==============================================================================
 def get_kategori_renk(kategori):
-    renkler = {
-        "Meyve": "#2ecc71", "Sebze": "#2ecc71", "Manav": "#2ecc71",
-        "Et": "#e74c3c", "Şarküteri": "#e74c3c",
-        "Süt": "#3498db", "Kahvaltılık": "#f1c40f",
-        "Temizlik": "#9b59b6", "Ev": "#9b59b6",
-        "Gıda": "#e67e22", "Bakliyat": "#d35400",
-        "Atıştırmalık": "#e84393", "Genel": "#95a5a6"
-    }
+    renkler = {"Meyve": "#2ecc71", "Sebze": "#27ae60", "Et": "#e74c3c", "Süt": "#3498db", "Temizlik": "#9b59b6", "Gıda": "#e67e22"}
     for key, color in renkler.items():
         if key in kategori: return color
     return "#34495e"
 
-# ==============================================================================
-# SÜRPRİZ VE PRENSES VERİTABANI
-# ==============================================================================
-def ask_kavanozu_sozleri():
-    return [
-        "Seninle her şey daha güzel.", "Bugün yine harika görünüyorsun.", "İyi ki hayatımdasın.", 
-        "Akşam çayı benden!", "Senin gülüşün güneşten daha parlak.", "Dünyanın en şanslı adamı benim.",
-        "Bir kahve molası verelim mi?", "Seni seviyorum, hem de çok!", "Bugün senin günün olsun.",
-        "Akşama en sevdiğin filmi izleyelim.", "Yemekler senden, bulaşıklar benden (şaka şaka).",
-        "Seninle yaşlanmak istiyorum.", "Gözlerinin içi gülüyor bugün.", "Harika bir eşsin.",
-        "Evin neşesi sensin.", "Bugün kendine bir güzellik yap.", "Seninle tartışmayı bile seviyorum.",
-        "Hayat arkadaşım, can yoldaşım.", "Sana sarılmak bütün yorgunluğumu alıyor.",
-        "Mesafeler engel değil, kalbim seninle.", "Seninle geçen her dakika kıymetli.",
-        "Prenses bile seni benden çok seviyor olabilir.", "Bugün gökyüzü senin için mavi.",
-        "En güzel manzaram sensin.", "Senin elinden zehir olsa yerim.", "Kalbimin tek sahibi.",
-        "Bu mesajı okuduysan bana bir öpücük borçlusun.", "Seni düşünmek bile yüzümü güldürüyor.",
-        "Dünyadaki en güzel tesadüfümsün.", "Seninle her yere gelirim.", "Birlikte başarabiliriz.",
-        "Bugün çok yoruldun, dinlenmeyi hak ettin.", "Sen benim evimsin.", "Huzurumsun.",
-        "Seni ilk gördüğüm günü hatırlıyorum.", "Aşkımız her geçen gün büyüyor.",
-        "Seninle kavga etmeyi bile özlüyorum.", "Benim süper kahramanım sensin.",
-        "Gülmek sana çok yakışıyor.", "Seninle sonsuza kadar...", "İyi ki varsın sevgilim.",
-        "Hayallerimin ortağısın.", "Sen olmasan bu ev çok sessiz olurdu.", "Seni çok özledim.",
-        "Akşama sürpriz var mı? (Yoksa ben yapayım)", "Seninle her şey mümkün.",
-        "Bugün prenses gibi hissediyor musun?", "Senin mutsuz olmana dayanamam.",
-        "Sadece seninle...", "Her şey seninle anlamlı."
-        # Listeyi 100'e tamamlayacak kadar çoğaltılabilir, şimdilik 50 tane örnek.
-    ]
-
-def prenses_sozleri():
-    return [
-        "🐈 Prenses: Mama kabım boşken bu uygulamada ne geziyorsun?",
-        "🐈 Prenses: Yunus'a söyle, o koltuk benim.",
-        "🐈 Prenses: Beni sevmeyi unuttunuz mu?",
-        "🐈 Prenses: Bugün çok tüy döktüm, süpürgeyi çalıştırın.",
-        "🐈 Prenses: Akşama balık mı var? Bana da ayırın.",
-        "🐈 Prenses: Evin gerçek sahibi benim, siz sadece kiracısınız.",
-        "🐈 Prenses: Şu an uyuyorum, beni rahatsız etmeyin.",
-        "🐈 Prenses: Yaş mama günü ne zamandı?",
-        "🐈 Prenses: Sizi izliyorum...",
-        "🐈 Prenses: Miyav! (Tercümesi: Beni sevin!)"
-    ]
-
-# ==============================================================================
-# AI MUTFAK ŞEFİ MOTORU
-# ==============================================================================
 def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
     tum_malzemeler = set()
     for urun in marketten_gelenler: tum_malzemeler.add(urun.lower().split("(")[0].strip())
@@ -129,10 +144,6 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
         "Kısır": ["bulgur", "salça", "yeşillik", "limon"],
         "Cacık": ["yoğurt", "salatalık", "sarımsak"],
         "Pilav": ["pirinç", "tereyağı", "şehriye"],
-        "Patates Kızartması": ["patates", "yağ"],
-        "Çoban Salata": ["domates", "salatalık", "biber", "soğan"],
-        "Mantarlı Tavuk": ["tavuk", "mantar", "krema"],
-        "Hamburger": ["kıyma", "ekmek", "domates", "yeşillik"]
     }
     
     tam, eksik = [], []
@@ -140,569 +151,344 @@ def mutfak_sefi_motoru(marketten_gelenler, manuel_eklenenler):
         eksikler = [m for m in malzemeler if m not in tum_malzemeler]
         if len(eksikler) == 0: tam.append(yemek)
         elif len(eksikler) <= 2: eksik.append((yemek, eksikler))
-    return tam, eksik, list(tum_malzemeler)
+    return tam, eksik
 
 # ==============================================================================
-# KARŞILAMA (PRENSES MODLU)
+# ⚡ İŞLEM YÖNETİCİSİ
 # ==============================================================================
-def karsilama_paneli():
-    # %30 İhtimalle Prenses Konuşur
-    if random.random() < 0.30:
-        soz = random.choice(prenses_sozleri())
-        st.markdown(f'<div class="prenses-box"><div class="welcome-title">🐾 MİYAV!</div><div class="welcome-note">{soz}</div></div>', unsafe_allow_html=True)
-    else:
-        # Normal Karşılama
-        saat = datetime.now().hour
-        selam = "Günaydın" if 5<=saat<12 else "Tünaydın" if 12<=saat<18 else "İyi Akşamlar" if 18<=saat<22 else "İyi Geceler"
-        sozler = [
-            "🏡 Evimiz kalemizdir.", "💡 Yemekler artık kendi menüsünde!",
-            "❤️ Bugün harika bir gün olacak.", "🛒 Eksikleri anında yaz ki unutulmasın.",
-            "👨‍🍳 Şef de emrinizde, Çark da!"
-        ]
-        st.markdown(f'<div class="welcome-box"><div class="welcome-title">{selam}! ☀️</div><div class="welcome-note">{random.choice(sozler)}</div></div>', unsafe_allow_html=True)
-
-# ==============================================================================
-# ARKA PLAN VE VERİTABANI
-# ==============================================================================
-def get_client():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(dict(st.secrets["connections"]["gsheets"]), scopes=scopes)
-    return gspread.authorize(creds)
-
-def arka_planda_ekle(satir):
-    try: get_client().open(DOSYA_ADI).sheet1.append_row(satir)
-    except: pass
-
-def arka_planda_sil(urun):
-    try:
-        sheet = get_client().open(DOSYA_ADI).sheet1
-        try: sheet.delete_rows(sheet.find(urun).row)
-        except:
-            for i, row in enumerate(sheet.get_all_values()):
-                if row[0] == urun: sheet.delete_rows(i+1); break
-    except: pass
-
-def arka_planda_guncelle(urun, durum):
-    try:
-        sheet = get_client().open(DOSYA_ADI).sheet1
-        try: sheet.update_cell(sheet.find(urun).row, 2, str(durum))
-        except:
-            for i, row in enumerate(sheet.get_all_values()):
-                if row[0] == urun: sheet.update_cell(i+1, 2, str(durum)); break
-    except: pass
-
-def arka_planda_guncelle_yatirim(urun, miktar, notlar, tip):
-    try:
-        client = get_client()
-        sheet = client.open(DOSYA_ADI).sheet1
-        bulundu = False
-        tum_veriler = sheet.get_all_values()
-        for i, row in enumerate(tum_veriler):
-            if row[0] == urun and row[4] == tip:
-                sheet.update_cell(i + 1, 2, datetime.now().strftime("%Y-%m-%d")) 
-                sheet.update_cell(i + 1, 3, str(miktar))
-                sheet.update_cell(i + 1, 4, str(notlar))
-                bulundu = True
-                break
-        if not bulundu: sheet.append_row([urun, datetime.now().strftime("%Y-%m-%d"), str(miktar), notlar, tip])
-    except: pass
-
-def verileri_yukle():
-    try:
-        data = get_client().open(DOSYA_ADI).sheet1.get_all_values()
-        if not data or "Urun" not in data[0]: return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
-        df = pd.DataFrame(data[1:], columns=data[0]).astype(str)
-        df = df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
-        return df
-    except: return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
-
-if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukle()
-
-# ==============================================================================
-# HIZLI İŞLEMLER
-# ==============================================================================
-def hizli_ekle(isim, tip, zaman="", mesaj="", durum="0"):
-    # Rutinler için her gün sıfırlanabilir
-    if tip in ["MARKET", "YEMEK_OGUN", "YEMEK_KAHVALTI"]:
-        mevcut = st.session_state.local_df[(st.session_state.local_df["Tip"] == tip) & (st.session_state.local_df["Urun"] == isim)]
-        if not mevcut.empty: return
-
-    row = {"Urun": isim, "Durum": durum, "Mesaj": mesaj, "Zaman": str(zaman), "Tip": tip}
-    st.session_state.local_df = pd.concat([st.session_state.local_df, pd.DataFrame([row])], ignore_index=True)
-    threading.Thread(target=arka_planda_ekle, args=([isim, durum, mesaj, str(zaman), tip],)).start()
-
-def hizli_sil(isim):
-    st.session_state.local_df = st.session_state.local_df[st.session_state.local_df["Urun"] != isim]
-    threading.Thread(target=arka_planda_sil, args=(isim,)).start()
-
-def hizli_durum_degistir(isim, yeni_durum):
-    idx = st.session_state.local_df[st.session_state.local_df["Urun"] == isim].index
-    if not idx.empty: st.session_state.local_df.at[idx[0], "Durum"] = str(yeni_durum)
-    threading.Thread(target=arka_planda_guncelle, args=(isim, yeni_durum)).start()
-
-def hizli_yatirim_guncelle(isim, miktar, notlar):
+def islem_yap(aksiyon, **kwargs):
     df = st.session_state.local_df
-    mask = (df["Tip"] == "YATIRIM") & (df["Urun"] == isim)
-    if df[mask].empty: hizli_ekle(isim, "YATIRIM", zaman=notlar, mesaj=str(miktar), durum=datetime.now().strftime("%Y-%m-%d"))
-    else:
-        idx = df[mask].index[0]
-        st.session_state.local_df.at[idx, "Mesaj"] = str(miktar)
-        st.session_state.local_df.at[idx, "Zaman"] = str(notlar)
-        st.session_state.local_df.at[idx, "Durum"] = datetime.now().strftime("%Y-%m-%d")
-        threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM")).start()
+    
+    if aksiyon == "ekle":
+        yeni = {"Urun": kwargs.get("urun"), "Durum": kwargs.get("durum", "0"), 
+                "Mesaj": kwargs.get("mesaj", ""), "Zaman": kwargs.get("zaman", ""), 
+                "Tip": kwargs.get("tip")}
+        
+        if kwargs.get("tip") in ["MARKET", "TODO"]:
+             if not df[(df["Tip"] == kwargs.get("tip")) & (df["Urun"] == kwargs.get("urun"))].empty:
+                 st.toast("⚠️ Zaten listede var!"); return
 
-def listeyi_temizle():
-    st.session_state.local_df = st.session_state.local_df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
-    st.toast("🧹 Liste temizlendi!")
-    time.sleep(1)
-    st.rerun()
+        st.session_state.local_df = pd.concat([df, pd.DataFrame([yeni])], ignore_index=True)
+        veri_senkronize_et(None, "ekle", list(yeni.values()))
+        st.toast(f"✅ Eklendi: {kwargs.get('urun')}")
 
-# CALLBACKLER
-def market_ekleme_callback():
-    val = st.session_state.market_giris
-    kat_secim = st.session_state.market_kategori_secim
-    kat_yeni = st.session_state.get("market_kategori_yeni", "")
-    kategori = kat_yeni if (kat_secim == "✏️ Yeni Kategori Yaz" and kat_yeni) else kat_secim
-    if val:
-        hizli_ekle(val, "MARKET", mesaj=kategori)
-        st.session_state.market_giris = ""
-        if "market_kategori_yeni" in st.session_state: st.session_state.market_kategori_yeni = ""
+    elif aksiyon == "sil":
+        urun = kwargs.get("urun")
+        st.session_state.local_df = df[df["Urun"] != urun]
+        veri_senkronize_et(None, "sil", urun)
+        st.toast("🗑️ Silindi!")
 
-def is_ekleme_callback():
-    val = st.session_state.is_giris
-    kat_secim = st.session_state.is_kategori_secim
-    kat_yeni = st.session_state.get("is_kategori_yeni", "")
-    kategori = kat_yeni if (kat_secim == "✏️ Yeni Kategori Yaz" and kat_yeni) else kat_secim
-    if val:
-        hizli_ekle(val, "TODO", mesaj=kategori)
-        st.session_state.is_giris = ""
-        if "is_kategori_yeni" in st.session_state: st.session_state.is_kategori_yeni = ""
+    elif aksiyon == "guncelle":
+        urun = kwargs.get("urun")
+        yeni_durum = kwargs.get("yeni_durum")
+        idx = df[df["Urun"] == urun].index
+        if not idx.empty:
+            st.session_state.local_df.at[idx[0], "Durum"] = str(yeni_durum)
+            veri_senkronize_et(None, "guncelle", (urun, yeni_durum))
+            if yeni_durum == "1": st.toast("👍 Tamamlandı!")
 
-def yemek_ekle_callback(input_key, tip_kod):
-    val = st.session_state[input_key]
-    if val:
-        hizli_ekle(val, tip_kod, durum="1") 
-        st.session_state[input_key] = ""
-
-def rutin_ekle_callback():
-    val = st.session_state.rutin_giris
-    if val:
-        hizli_ekle(val, "RUTIN", durum="0")
-        st.session_state.rutin_giris = ""
-
-def ekleme_callback(key, tip):
-    val = st.session_state[key]
-    if val: hizli_ekle(val, tip); st.session_state[key] = ""
-
-def not_callback():
-    baslik, icerik = st.session_state.not_baslik, st.session_state.not_icerik
-    if baslik and icerik: hizli_ekle(baslik, "NOTE", mesaj=icerik, durum=datetime.now().strftime("%d-%m-%Y")); st.session_state.not_baslik = ""; st.session_state.not_icerik = ""
-
-def sayac_callback():
-    ad, tarih = st.session_state.sayac_ad, st.session_state.sayac_tarih
-    if ad: hizli_ekle(ad, "COUNTDOWN", zaman=str(tarih)); st.session_state.sayac_ad = ""
-
-def fatura_callback():
-    ad, gun, saat, tekrar = st.session_state.fat_ad, st.session_state.fat_gun, st.session_state.fat_saat, st.session_state.fat_tekrar
-    if ad:
-        kod = "HER_AY" if tekrar == "🔁 Her Ay" else "TEK"
-        hizli_ekle(ad, "FATURA", gun, str(saat)[0:5], kod)
-        st.session_state.fat_ad = ""
-
-def butce_callback():
-    ad, tutar, tur = st.session_state.butce_ad, st.session_state.butce_tutar, st.session_state.butce_tur
-    if ad and tutar > 0: hizli_ekle(ad, "BUTCE", mesaj=str(tutar), durum=tur, zaman=datetime.now().strftime("%Y-%m-%d")); st.session_state.butce_ad = ""; st.session_state.butce_tutar = 0
-
-def yatirim_callback():
-    ad, miktar, notlar = st.session_state.yat_ad, st.session_state.yat_mik, st.session_state.yat_not
-    if ad: hizli_yatirim_guncelle(ad, miktar, notlar); st.session_state.yat_ad = ""; st.session_state.yat_not = ""
-
-def alarm_kur(mesaj, sure):
-    hedef = datetime.now() + timedelta(minutes=sure)
-    hizli_ekle(f"{mesaj} ({hedef.strftime('%H:%M')})", "ALARM", hedef.strftime("%Y-%m-%d %H:%M:%S"), mesaj, "-1")
-    try: requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=f"✅ Alarm: {sure} dk sonra '{mesaj}'".encode('utf-8'), headers={"Title": "Ev Asistanı".encode('utf-8'), "Priority": "high"})
-    except: pass
-
-def silme_butonu_koy(prefix, urun):
-    if not st.session_state.get(f"conf_{prefix}_{urun}"):
-        if st.button("🗑️", key=f"del_{prefix}_{urun}"): st.session_state[f"conf_{prefix}_{urun}"] = True; st.rerun()
-    else:
-        if st.button("Sil?", key=f"yes_{prefix}_{urun}", type="primary"):
-            hizli_sil(urun)
-            st.session_state[f"conf_{prefix}_{urun}"] = False; st.rerun()
-        st.caption("İptal")
+def oge_satiri(idx, row, sil_fn, durum_fn):
+    c1, c2 = st.columns([0.85, 0.15], vertical_alignment="center")
+    with c1:
+        chk = row['Durum'] == "1"
+        if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"c_{row['Tip']}_{idx}"):
+            if not chk: durum_fn(row['Urun'], "1"); st.rerun()
+        else:
+            if chk: durum_fn(row['Urun'], "0"); st.rerun()
+    with c2:
+        if st.button("🗑️", key=f"d_{row['Tip']}_{idx}"): sil_fn(row['Urun']); st.rerun()
 
 # ==============================================================================
-# DASHBOARD (EVİN NABZI) - GİZLİLİK MODU
+# 📱 SAYFALAR
 # ==============================================================================
 def dashboard_goster():
     df = st.session_state.local_df
-    
-    # Sıradaki Fatura
+    # Fatura Kontrolü
     df_f = df[df["Tip"] == "FATURA"]
-    siradaki_fatura = "Yok"; kalan_gun_txt = ""
+    fatura_txt, kalan_txt = "Fatura Yok", ""
     if not df_f.empty:
         bugun = datetime.now().day
-        df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32)
-        df_f = df_f.sort_values("Gun_Sayi")
+        df_f["Gun"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32)
+        df_f = df_f.sort_values("Gun")
         for _, row in df_f.iterrows():
-            kalan = int(row["Gun_Sayi"]) - bugun
+            kalan = int(row["Gun"]) - bugun
             if kalan >= 0:
-                siradaki_fatura = row["Urun"]
-                kalan_gun_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
+                fatura_txt = row["Urun"]
+                kalan_txt = "Bugün" if kalan == 0 else f"{kalan} gün"
                 break
     
-    # Market Sepeti
-    sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
-
+    sepet = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
     c1, c2 = st.columns(2)
-    c1.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
-    c2.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
-    st.markdown("---")
+    with c1: st.markdown(f"<div class='metric-card'>🧾 <b>{fatura_txt}</b><br><small>{kalan_txt}</small></div>", unsafe_allow_html=True)
+    with c2: st.markdown(f"<div class='metric-card'>🛒 <b>Sepet</b><br><small>{sepet} Ürün</small></div>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-# ==============================================================================
-# SAYFALAR
-# ==============================================================================
 def sayfa_ana_ekran():
-    # SÜRPRİZ BUTONU
-    if st.button("🎁 Bana Bir Sürpriz Yap", type="primary", use_container_width=True):
-        st.balloons()
-        soz = random.choice(ask_kavanozu_sozleri())
-        st.success(f"💌 {soz}")
-        time.sleep(3)
-
-    tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
+    karsilama_paneli()
+    dashboard_goster()
     
+    tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 GÖREVLER", "🔔 ALARM"])
     with tab1:
+        c1, c2 = st.columns([0.7, 0.3])
+        with c1: urun = st.text_input("Hızlı Ekle", key="m_in", label_visibility="collapsed", placeholder="Süt, Ekmek...")
+        with c2: 
+            if st.button("EKLE", key="m_btn", use_container_width=True) and urun:
+                islem_yap("ekle", urun=urun, tip="MARKET", mesaj="Genel"); st.rerun()
+
         df = st.session_state.local_df
-        df_market = df[df["Tip"] == "MARKET"]
+        alinacaklar = df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")]
         
-        VARSAYILAN_KATEGORILER = ["🍏 Meyve & Sebze", "🥩 Et & Şarküteri", "🥛 Süt & Kahvaltılık", "🍞 Gıda & Bakliyat", "🧹 Temizlik", "🍫 Atıştırmalık"]
-        kayitli_kategoriler = {k for k in set(df_market["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]}
-        TUM_KATEGORILER = sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler)) + ["✏️ Yeni Kategori Yaz"]
-        
-        c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
-        with c2: st.selectbox("Kategori", TUM_KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
-        with c3: st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
-        
-        if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
-            st.text_input("Yeni Kategori Adı:", key="market_kategori_yeni", placeholder="Örn: Tekne")
-
-        st.markdown("---")
-        
-        alinacaklar = df_market[df_market["Durum"] == "0"]
-        st.subheader("📌 Alınacaklar Listesi")
-        if alinacaklar.empty: st.success("Sepet Boş! 🎉")
-        
-        kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
-        if "Genel" in kategori_listesi: kategori_listesi.remove("Genel"); kategori_listesi.append("Genel")
-
-        for kat in kategori_listesi:
-            if kat == "Genel": items = alinacaklar[(alinacaklar["Mesaj"] == "") | (alinacaklar["Mesaj"] == "Genel") | (alinacaklar["Mesaj"] == "None")]
-            else: items = alinacaklar[alinacaklar["Mesaj"] == kat]
-            
-            if not items.empty:
-                renk = get_kategori_renk(kat)
-                with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
-                    for i, row in items.iterrows():
-                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                        with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
-
-        st.divider()
-        tamamlananlar = df_market[df_market["Durum"] == "1"]
-        with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
-            if tamamlananlar.empty: st.info("Geçmiş boş.")
-            else:
-                for kat in kategori_listesi:
-                    if kat == "Genel": items = tamamlananlar[(tamamlananlar["Mesaj"] == "") | (tamamlananlar["Mesaj"] == "Genel") | (tamamlananlar["Mesaj"] == "None")]
-                    else: items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
-                    if not items.empty:
-                        with st.expander(f"{kat} ({len(items)})"):
-                            for i, row in items.iterrows():
-                                c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                                with c1:
-                                    if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
-                                with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
-
-    with tab2:
-        df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
-        VARSAYILAN_IS = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba"]
-        kayitli_is = {k for k in set(df_todo["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]}
-        TUM_ISLER = sorted(list(set(VARSAYILAN_IS) | kayitli_is)) + ["✏️ Yeni Kategori Yaz"]
-
-        c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Görev", key="is_giris", label_visibility="collapsed", placeholder="Yapılacak iş...")
-        with c2: st.selectbox("Kategori", TUM_ISLER, key="is_kategori_secim", label_visibility="collapsed")
-        with c3: st.button("EKLE", key="btn_t", on_click=is_ekleme_callback, use_container_width=True)
-        if st.session_state.is_kategori_secim == "✏️ Yeni Kategori Yaz": st.text_input("Yeni Kategori Adı:", key="is_kategori_yeni")
-        st.markdown("---")
-        is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
-        if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
-        st.subheader("📌 Yapılacaklar Listesi")
-        for kat in is_listesi:
-            if kat == "Genel": items = df_todo[(df_todo["Durum"] == "0") & ((df_todo["Mesaj"] == "") | (df_todo["Mesaj"] == "Genel") | (df_todo["Mesaj"] == "None"))]
-            else: items = df_todo[(df_todo["Durum"] == "0") & (df_todo["Mesaj"] == kat)]
-            if not items.empty:
-                renk = get_kategori_renk(kat)
-                with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
-                    for i, row in items.iterrows():
-                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                        with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
-
-    with tab3:
-        with st.form("alarm"):
-            mesaj = st.text_input("Not", placeholder="Fırın...")
-            sure = st.number_input("Dakika", min_value=1, value=15)
-            if st.form_submit_button("🔔 Kur", use_container_width=True): alarm_kur(mesaj, sure); st.success("Kuruldu!"); time.sleep(1); st.rerun()
-        df_a = st.session_state.local_df[st.session_state.local_df["Tip"] == "ALARM"]
-        if not df_a.empty:
-            st.markdown("---"); simdi = datetime.now()
-            for i, row in df_a.iterrows():
-                try:
-                    hedef = datetime.strptime(row["Zaman"], "%Y-%m-%d %H:%M:%S"); kalan = (hedef - simdi).total_seconds()
-                    c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="center")
-                    with c1: st.write(f"**{row['Mesaj']}**"); st.caption(hedef.strftime('%H:%M'))
-                    with c2: st.info(f"⏳ {int(kalan/60)} dk") if kalan > 0 else st.error("🔔")
-                    with c3: silme_butonu_koy(f"al_{i}", row['Urun'])
-                    st.divider()
-                except: pass
-
-def sayfa_ekonomi():
-    tab1, tab2, tab3 = st.tabs(["💸 ÖDEME", "💰 BÜTÇE", "📈 YATIRIM"])
-    with tab1:
-        with st.expander("➕ Yeni Ödeme", expanded=True):
-            c1, c2 = st.columns(2)
-            with c1: st.text_input("Adı", key="fat_ad"); st.number_input("Günü", 1, 31, 1, key="fat_gun")
-            with c2: st.time_input("Saat", dt_time(9,0), key="fat_saat"); st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek"], key="fat_tekrar")
-            st.button("KAYDET", key="btn_fat_save", on_click=fatura_callback, use_container_width=True)
-        st.markdown("---")
-        df_f = st.session_state.local_df[st.session_state.local_df["Tip"] == "FATURA"]
-        if not df_f.empty:
-            bugun = datetime.now().day
-            df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32); df_f = df_f.sort_values("Gun_Sayi")
-            for i, row in df_f.iterrows():
-                try:
-                    gun = int(row["Gun_Sayi"]); kalan = gun - bugun
-                    c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="center")
-                    with c1: st.write(f"**{row['Urun']}**"); st.caption(f"{row.get('Mesaj','09:00')} | {row['Durum']}")
-                    with c2: st.error("❗ BUGÜN") if kalan==0 else st.success(f"⏳ {kalan} gün") if kalan>0 else st.warning("Geçti")
-                    with c3: silme_butonu_koy(f"fat_{i}", row['Urun'])
-                    st.divider()
-                except: pass
-
-    with tab2:
-        with st.expander("➕ Gelir/Gider", expanded=True):
-            c1, c2 = st.columns(2)
-            with c1: st.radio("Tür", ["Gider", "Gelir"], horizontal=True, key="butce_tur"); st.text_input("Açıklama", key="butce_ad")
-            with c2: st.number_input("Tutar", key="butce_tutar"); st.write(""); st.button("KAYDET", key="btn_butce_save", on_click=butce_callback, use_container_width=True)
-        st.markdown("---")
-        df_b = st.session_state.local_df[st.session_state.local_df["Tip"] == "BUTCE"].copy()
-        if not df_b.empty:
-            df_b["Tarih"] = pd.to_datetime(df_b["Zaman"], errors='coerce').fillna(datetime.now())
-            bu_ay = datetime.now().strftime("%Y-%m"); df_bu_ay = df_b[df_b["Tarih"].dt.strftime('%Y-%m') == bu_ay]
-            gelir = sum(float(r["Mesaj"]) for _, r in df_bu_ay.iterrows() if r["Durum"] == "Gelir")
-            gider = sum(float(r["Mesaj"]) for _, r in df_bu_ay.iterrows() if r["Durum"] == "Gider")
-            if gelir > 0: st.progress(min(gider / gelir, 1.0), f"Harcama: %{int((gider/gelir)*100)}")
-            c1, c2, c3 = st.columns(3); c1.metric("Gelir", f"{gelir:.0f}₺"); c2.metric("Gider", f"{gider:.0f}₺"); c3.metric("Kalan", f"{gelir-gider:.0f}₺")
-            st.divider()
-            for i, row in df_bu_ay.iterrows():
-                c1, c2, c3 = st.columns([0.45, 0.35, 0.20], gap="small", vertical_alignment="center")
-                with c1: st.write(f"{'🟢' if row['Durum']=='Gelir' else '🔴'} **{row['Urun']}**")
-                with c2: st.write(f"{row['Mesaj']} ₺")
-                with c3: silme_butonu_koy(f"b_{i}", row['Urun'])
-
-    with tab3:
-        with st.expander("➕ Varlık Ekle", expanded=True):
-            c1, c2 = st.columns(2)
-            with c1: st.text_input("Varlık", key="yat_ad"); st.number_input("Değer", step=100.0, key="yat_mik")
-            with c2: st.text_area("Not", height=100, key="yat_not"); st.button("KAYDET", key="btn_yat_save", on_click=yatirim_callback, use_container_width=True)
-        df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]
-        
-        if GRAFIK_VAR and not df_y.empty:
-            df_y["Tutar"] = df_y["Mesaj"].apply(lambda x: float(x) if x.replace('.','',1).isdigit() else 0)
-            toplam = df_y["Tutar"].sum()
-            st.markdown("---")
-            c1, c2 = st.columns([1, 2])
-            with c1: st.metric("💰 TOPLAM", f"{toplam:,.0f} ₺")
-            with c2:
-                fig = px.pie(df_y, values='Tutar', names='Urun', title='Varlık Dağılımı', hole=0.4)
-                fig.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
-                st.plotly_chart(fig, use_container_width=True)
-        elif not df_y.empty:
-            st.warning("⚠️ Grafik için 'requirements.txt' dosyasına 'plotly' ekle.")
-            toplam = sum(float(r["Mesaj"]) for _, r in df_y.iterrows() if r["Mesaj"].replace('.','',1).isdigit())
-            st.metric("💰 TOPLAM", f"{toplam:,.0f} ₺")
-
-        st.divider()
-        for i, row in df_y.iterrows():
-            c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="center")
-            with c1: st.subheader(f"💎 {row['Urun']}"); st.caption(f"{row['Mesaj']} ₺ | {row['Durum']}")
-            with c2: silme_butonu_koy(f"y_{i}", row['Urun'])
-
-# ==============================================================================
-# YENİ MENÜ: YEMEKLER
-# ==============================================================================
-def sayfa_yemekler():
-    tab1, tab2, tab3, tab4 = st.tabs(["🔥 EŞLEŞME", "🎡 KAHVALTI", "🎡 YEMEK", "👨‍🍳 AI ŞEF"])
-    
-    with st.expander("⚙️ Temizlik"):
-        if st.button("🧹 Çift Kayıtları Temizle", use_container_width=True): listeyi_temizle()
-
-    # OYUN MODU
-    with tab1:
-        st.caption("Tinder usulü yemek seçimi! Kararsız kaldığınızda kullanın.")
-        df_oyun = st.session_state.local_df[(st.session_state.local_df["Tip"].isin(["YEMEK_OGUN", "YEMEK_KAHVALTI"])) & (st.session_state.local_df["Durum"] == "1")]
-        yemek_listesi = df_oyun["Urun"].tolist()
-        
-        if not yemek_listesi:
-            st.warning("Önce Çark kısmından yemek ekleyin!")
+        if alinacaklar.empty: st.info("Sepet boş! 🎉")
         else:
-            if 'oyun_yemegi' not in st.session_state:
-                st.session_state.oyun_yemegi = random.choice(yemek_listesi)
+            cats = sorted(list(set(alinacaklar["Mesaj"].unique())))
+            for cat in cats:
+                items = alinacaklar[alinacaklar["Mesaj"] == cat]
+                renk = get_kategori_renk(cat)
+                with st.expander(f"{cat if cat else 'Genel'} ({len(items)})", expanded=True):
+                    st.markdown(f"<div class='category-line' style='background-color:{renk};'></div>", unsafe_allow_html=True)
+                    for i, row in items.iterrows():
+                        oge_satiri(i, row, lambda u: islem_yap("sil", urun=u), lambda u, d: islem_yap("guncelle", urun=u, yeni_durum=d))
+
+    with tab2: # GÖREVLER
+        c1, c2 = st.columns([0.7, 0.3])
+        with c1: is_adi = st.text_input("Görev", key="t_in", label_visibility="collapsed", placeholder="Tamirat...")
+        with c2:
+             if st.button("EKLE", key="t_btn", use_container_width=True) and is_adi:
+                islem_yap("ekle", urun=is_adi, tip="TODO", mesaj="Genel"); st.rerun()
+        
+        todos = st.session_state.local_df[(st.session_state.local_df["Tip"] == "TODO") & (st.session_state.local_df["Durum"] == "0")]
+        if todos.empty: st.success("İşler bitti! 🏖️")
+        else:
+            for i, row in todos.iterrows():
+                st.markdown("---")
+                oge_satiri(i+1000, row, lambda u: islem_yap("sil", urun=u), lambda u, d: islem_yap("guncelle", urun=u, yeni_durum=d))
+
+    with tab3: # ALARM
+        with st.form("al_form"):
+            c1, c2 = st.columns([3, 1])
+            msg = c1.text_input("Alarm Adı")
+            dk = c2.number_input("Dk", 1, 60, 15)
+            if st.form_submit_button("Kur", use_container_width=True):
+                hedef = datetime.now() + timedelta(minutes=dk)
+                islem_yap("ekle", urun=f"{msg} ({hedef.strftime('%H:%M')})", tip="ALARM", zaman=hedef.strftime("%Y-%m-%d %H:%M:%S"), mesaj=msg, durum="-1")
+                try: 
+                    import requests
+                    requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=f"Alarm: {msg}".encode("utf-8"))
+                except: pass
+                st.rerun()
+        
+        alarms = st.session_state.local_df[st.session_state.local_df["Tip"] == "ALARM"]
+        for i, row in alarms.iterrows():
+            try:
+                kalan = (datetime.strptime(row["Zaman"], "%Y-%m-%d %H:%M:%S") - datetime.now()).total_seconds()
+                c1, c2 = st.columns([0.8, 0.2])
+                with c1: st.write(f"⏰ **{row['Mesaj']}**"); st.caption("Süre doldu!" if kalan < 0 else f"Kalan: {int(kalan/60)} dk")
+                with c2: 
+                    if st.button("Sil", key=f"ad_{i}"): islem_yap("sil", urun=row["Urun"]); st.rerun()
+                st.divider()
+            except: pass
+
+def sayfa_yemek():
+    st.subheader("🍽️ Mutfak & Yemek")
+    tab1, tab2, tab3 = st.tabs(["🔥 EŞLEŞME", "👨‍🍳 ŞEF", "LİSTE"])
+    
+    with tab1: # OYUN MODU
+        st.caption("Tinder usulü yemek seçimi! Kararsız kaldığınızda kullanın.")
+        yemekler = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_OGUN"]["Urun"].tolist()
+        
+        if not yemekler: st.warning("Listede yemek yok, 'Liste' sekmesinden ekleyin.")
+        else:
+            if 'oyun_yemegi' not in st.session_state: st.session_state.oyun_yemegi = random.choice(yemekler)
             
-            st.markdown(f"<h2 style='text-align: center;'>🍽️ {st.session_state.oyun_yemegi} 🍽️</h2>", unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; padding:20px; background:#fff; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1); margin:20px 0;'><h2>🍽️ {st.session_state.oyun_yemegi} 🍽️</h2></div>", unsafe_allow_html=True)
             
             c1, c2 = st.columns(2)
             if c1.button("👎 Olmaz", use_container_width=True):
-                st.session_state.oyun_yemegi = random.choice(yemek_listesi)
-                st.rerun()
-            
-            if c2.button("👍 Olur", type="primary", use_container_width=True):
-                st.balloons()
-                st.success(f"HARİKA! Akşama {st.session_state.oyun_yemegi} var! Afiyet olsun.")
+                st.session_state.oyun_yemegi = random.choice(yemekler); st.rerun()
+            if c2.button("👍 Olur!", type="primary", use_container_width=True):
+                st.balloons(); st.success(f"Akşama {st.session_state.oyun_yemegi} var! Afiyet olsun.")
 
-    with tab2:
-        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Kahvaltı Ekle", key="kahvalti_giris", label_visibility="collapsed")
-        with c2: st.button("EKLE", key="btn_kahvalti", on_click=yemek_ekle_callback, args=("kahvalti_giris", "YEMEK_KAHVALTI"), use_container_width=True)
-        st.markdown("---")
-        df_k = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_KAHVALTI"]
-        havuz = df_k[df_k["Durum"] == "1"]["Urun"].tolist()
-        if havuz:
-            if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_kahvalti", type="primary", use_container_width=True):
-                st.balloons(); st.success(f"🍳 Kahvaltı: **{random.choice(havuz)}**")
-        for i, row in df_k.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-            with c1:
-                chk = (row['Durum'] == "1")
-                if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"k_chk_{i}"):
-                    if not chk: hizli_durum_degistir(row['Urun'], "1")
-                else:
-                    if chk: hizli_durum_degistir(row['Urun'], "0")
-            with c2: silme_butonu_koy(f"k_del_{i}", row['Urun'])
+    with tab2: # AI ŞEF
+        st.info("Evdeki malzemeleri seç, sana yemek önereyim.")
+        market_stok = st.session_state.local_df[(st.session_state.local_df["Tip"] == "MARKET") & (st.session_state.local_df["Durum"] == "1")]["Urun"].tolist()
+        ek_malzeme = st.multiselect("Ek Malzemeler", ["Yumurta", "Patates", "Kıyma", "Tavuk", "Makarna", "Domates", "Peynir", "Soğan", "Salça"])
+        
+        if st.button("🔍 Tarif Bul", type="primary", use_container_width=True):
+            tam, eksik = mutfak_sefi_motoru(market_stok, ek_malzeme)
+            if tam: st.success(f"✅ **Yapabilirsin:** {', '.join(tam)}")
+            elif eksik: 
+                for y, e in eksik: st.warning(f"🟠 **{y}** için eksik: {', '.join(e)}")
+            else: st.error("Bu malzemelerle tarif bulamadım.")
 
-    with tab3:
-        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Yemek Ekle", key="yemek_giris", label_visibility="collapsed")
-        with c2: st.button("EKLE", key="btn_yemek", on_click=yemek_ekle_callback, args=("yemek_giris", "YEMEK_OGUN"), use_container_width=True)
-        st.markdown("---")
-        df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_OGUN"]
-        havuz = df_y[df_y["Durum"] == "1"]["Urun"].tolist()
-        if havuz:
-            if st.button(f"🎲 KURA ÇEK ({len(havuz)})", key="spin_yemek", type="primary", use_container_width=True):
-                st.balloons(); st.success(f"🥘 Akşam Yemeği: **{random.choice(havuz)}**")
-        for i, row in df_y.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-            with c1:
-                chk = (row['Durum'] == "1")
-                if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"y_chk_{i}"):
-                    if not chk: hizli_durum_degistir(row['Urun'], "1")
-                else:
-                    if chk: hizli_durum_degistir(row['Urun'], "0")
-            with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
+    with tab3: # YEMEK LİSTESİ YÖNETİMİ
+        c1, c2 = st.columns([0.7, 0.3])
+        with c1: y_ad = st.text_input("Yemek Ekle", key="y_in", label_visibility="collapsed")
+        with c2: 
+            if st.button("EKLE", key="y_btn", use_container_width=True) and y_ad:
+                islem_yap("ekle", urun=y_ad, tip="YEMEK_OGUN", durum="1"); st.rerun()
+        
+        y_df = st.session_state.local_df[st.session_state.local_df["Tip"] == "YEMEK_OGUN"]
+        for i, row in y_df.iterrows():
+            c1, c2 = st.columns([0.8, 0.2])
+            with c1: st.write(f"🥘 {row['Urun']}")
+            with c2: 
+                if st.button("🗑️", key=f"yd_{i}"): islem_yap("sil", urun=row['Urun']); st.rerun()
 
-    with tab4:
-        st.subheader("👨‍🍳 AI Mutfak Şefi")
-        df = st.session_state.local_df
-        marketten_gelenler = df[(df["Tip"] == "MARKET") & (df["Durum"] == "1")]["Urun"].tolist()
-        malzemeler = ["Yumurta", "Domates", "Biber", "Soğan", "Kıyma", "Patates", "Tavuk", "Makarna", "Salça", "Pirinç", "Mercimek", "Yoğurt", "Salatalık", "Patlıcan", "Mantar"]
-        ek_malzemeler = st.multiselect("Evde başka ne var?", malzemeler)
-        if st.button("🔍 Ne Pişirsem?", type="primary", use_container_width=True):
-            tam, eksik, stok_listesi = mutfak_sefi_motoru(marketten_gelenler, ek_malzemeler)
-            with st.expander("📦 Algılanan Stoklar"): st.write(", ".join(stok_listesi))
-            if tam: st.success(f"✅ **Hemen Yapabilirsin:** {', '.join(tam)}")
-            if eksik:
-                st.markdown("---"); st.warning("🛒 **Ufak Eksikler Var:**")
-                for yemek, eksikler in eksik: st.write(f"• **{yemek}** için eksik: *{', '.join(eksikler)}*")
-            if not tam and not eksik: st.error("Bu malzemelerle bir tarif bulamadım.")
-
-# ==============================================================================
-# SADELEŞEN MENÜ: YAŞAM
-# ==============================================================================
-def sayfa_yasam():
-    tab1, tab2, tab3 = st.tabs(["⛓️ ZİNCİR", "⏳ SAYAÇ", "📒 NOTLAR"])
-
-    with tab1:
-        st.caption("Günlük hedeflerini tamamla, zinciri kırma!")
-        c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Rutin Ekle", key="rutin_giris", label_visibility="collapsed", placeholder="Su iç...")
-        with c2: st.button("EKLE", key="btn_rutin", on_click=rutin_ekle_callback, use_container_width=True)
-        df_r = st.session_state.local_df[st.session_state.local_df["Tip"] == "RUTIN"]
-        completed = len(df_r[df_r["Durum"] == "1"])
-        if len(df_r) > 0: st.progress(completed/len(df_r), text=f"Günlük İlerleme: %{int((completed/len(df_r))*100)}")
-        st.markdown("---")
-        for i, row in df_r.iterrows():
-            c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-            with c1:
-                is_done = (row['Durum'] == "1")
-                if st.checkbox(f"**{row['Urun']}**", value=is_done, key=f"r_chk_{i}"):
-                    if not is_done: hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                else:
-                    if is_done: hizli_durum_degistir(row['Urun'], "0"); st.rerun()
-            with c2: silme_butonu_koy(f"r_del_{i}", row['Urun'])
-
-    with tab2:
+def sayfa_yasam(): # YENİDEN EKLENDİ
+    st.subheader("🧬 Yaşam Takibi")
+    tab1, tab2, tab3 = st.tabs(["⛓️ RUTİN", "⏳ SAYAÇ", "📒 NOTLAR"])
+    
+    with tab1: # RUTİN / ZİNCİR
+        c1, c2 = st.columns([0.7, 0.3])
+        with c1: r_ad = st.text_input("Rutin Ekle", key="r_in", placeholder="Su iç, Kitap oku...")
+        with c2: 
+            if st.button("EKLE", key="r_btn", use_container_width=True) and r_ad:
+                islem_yap("ekle", urun=r_ad, tip="RUTIN", durum="0"); st.rerun()
+        
+        rutinler = st.session_state.local_df[st.session_state.local_df["Tip"] == "RUTIN"]
+        if not rutinler.empty:
+            tamamlanan = len(rutinler[rutinler["Durum"]=="1"])
+            st.progress(tamamlanan/len(rutinler), text=f"Günlük İlerleme: %{int(tamamlanan/len(rutinler)*100)}")
+            st.markdown("---")
+            for i, row in rutinler.iterrows():
+                oge_satiri(i+2000, row, lambda u: islem_yap("sil", urun=u), lambda u, d: islem_yap("guncelle", urun=u, yeni_durum=d))
+    
+    with tab2: # SAYAÇ
         with st.expander("➕ Yeni Sayaç", expanded=True):
-            st.text_input("Etkinlik", key="sayac_ad"); st.date_input("Tarih", key="sayac_tarih")
-            st.button("KAYDET", key="btn_syc_save", on_click=sayac_callback)
-        df_s = st.session_state.local_df[st.session_state.local_df["Tip"] == "COUNTDOWN"]
-        if not df_s.empty:
-            st.markdown("---"); bugun = datetime.now().date()
-            for i, row in df_s.iterrows():
-                try:
-                    hedef = datetime.strptime(row["Zaman"], "%Y-%m-%d").date(); kalan = (hedef - bugun).days
-                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                    with c1: st.write(f"🎉 **{row['Urun']}**"); st.info(f"⏳ **{kalan}** gün kaldı") if kalan > 0 else st.success("🎉 BUGÜN!")
-                    with c2: silme_butonu_koy(f"syc_{i}", row['Urun'])
-                    st.divider()
-                except: pass
+            s_ad = st.text_input("Etkinlik")
+            s_tar = st.date_input("Tarih")
+            if st.button("Kaydet", key="s_btn"):
+                islem_yap("ekle", urun=s_ad, tip="COUNTDOWN", zaman=str(s_tar))
+                st.rerun()
+        
+        sayaclar = st.session_state.local_df[st.session_state.local_df["Tip"] == "COUNTDOWN"]
+        for i, row in sayaclar.iterrows():
+            try:
+                hedef = datetime.strptime(row["Zaman"], "%Y-%m-%d").date()
+                kalan = (hedef - datetime.now().date()).days
+                c1, c2 = st.columns([0.8, 0.2])
+                with c1: st.write(f"🎉 **{row['Urun']}**"); st.info(f"{kalan} gün kaldı") if kalan>0 else st.success("BUGÜN!")
+                with c2: 
+                    if st.button("🗑️", key=f"sd_{i}"): islem_yap("sil", urun=row['Urun']); st.rerun()
+                st.divider()
+            except: pass
 
-    with tab3:
-        with st.expander("➕ Not Ekle", expanded=True):
-            st.text_input("Başlık", key="not_baslik"); st.text_area("İçerik", key="not_icerik"); st.button("KAYDET", key="btn_not_save", on_click=not_callback)
-        df_n = st.session_state.local_df[st.session_state.local_df["Tip"] == "NOTE"]
-        for i, row in df_n.iterrows():
-            with st.expander(f"📒 {row['Urun']}"): st.code(row['Mesaj']); silme_butonu_koy(f"nt_{i}", row['Urun'])
+    with tab3: # NOTLAR
+        with st.expander("➕ Not Ekle"):
+            baslik = st.text_input("Başlık")
+            icerik = st.text_area("İçerik")
+            if st.button("Kaydet", key="n_btn") and baslik:
+                islem_yap("ekle", urun=baslik, tip="NOTE", mesaj=icerik)
+                st.rerun()
+        
+        notlar = st.session_state.local_df[st.session_state.local_df["Tip"] == "NOTE"]
+        for i, row in notlar.iterrows():
+            with st.expander(f"📒 {row['Urun']}"):
+                st.code(row['Mesaj'])
+                if st.button("Sil", key=f"nd_{i}"): islem_yap("sil", urun=row['Urun']); st.rerun()
 
-def sayfa_dosya():
-    st.subheader("📂 PDF Çevirici")
-    dosya = st.file_uploader("Resim Yükle", type=["png", "jpg", "jpeg"])
-    if dosya:
-        import img2pdf; st.download_button("⬇️ İndir", img2pdf.convert(dosya.read()), f"{dosya.name}.pdf", "application/pdf")
+def sayfa_dosya(): # YENİDEN EKLENDİ
+    st.subheader("📂 PDF Araçları")
+    if not PDF_VAR: st.error("Lütfen 'img2pdf' kütüphanesini yükleyin.")
+    else:
+        uploaded = st.file_uploader("Resim Yükle (JPG/PNG)", type=["jpg", "png", "jpeg"], accept_multiple_files=False)
+        if uploaded:
+            st.image(uploaded, width=200)
+            if st.button("PDF'e Çevir ve İndir", type="primary"):
+                pdf_bytes = img2pdf.convert(uploaded.read())
+                st.download_button("⬇️ İndir", pdf_bytes, file_name=f"{uploaded.name}.pdf", mime="application/pdf")
+
+def sayfa_ekonomi():
+    st.subheader("💰 Hane Ekonomisi")
+    tab1, tab2 = st.tabs(["GELİR/GİDER", "YATIRIMLAR"])
+    
+    with tab1: # FATURALAR & BÜTÇE
+        with st.expander("➕ Fatura/Ödeme Ekle", expanded=False):
+            col1, col2 = st.columns(2)
+            f_ad = col1.text_input("Fatura Adı", placeholder="İnternet...")
+            f_gun = col2.number_input("Son Ödeme Günü (1-31)", 1, 31, 15)
+            if st.button("Fatura Kaydet", use_container_width=True):
+                islem_yap("ekle", urun=f_ad, tip="FATURA", zaman=str(f_gun), mesaj="09:00", durum="HER_AY"); st.rerun()
+                
+        # Fatura Listesi
+        df_f = st.session_state.local_df[st.session_state.local_df["Tip"] == "FATURA"]
+        if not df_f.empty:
+            st.markdown("##### 📅 Yaklaşan Ödemeler")
+            df_f["Gun"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32)
+            for i, row in df_f.sort_values("Gun").iterrows():
+                kalan = int(row["Gun"]) - datetime.now().day
+                durum_renk = "red" if kalan == 0 else "orange" if kalan < 3 else "green"
+                st.markdown(f"**{row['Urun']}**: <span style='color:{durum_renk}'>{kalan} gün kaldı</span>", unsafe_allow_html=True)
+                if st.button("Ödendi (Sil)", key=f"fd_{i}"): islem_yap("sil", urun=row['Urun']); st.rerun()
+            st.markdown("---")
+
+        # Gelir Gider Ekleme
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1: aciklama = st.text_input("İşlem", placeholder="Market, Maaş...")
+        with c2: tutar = st.number_input("Tutar", min_value=0.0, step=50.0)
+        with c3: tur = st.selectbox("Tür", ["Gider", "Gelir"], label_visibility="collapsed")
+        if st.button("KAYDET", use_container_width=True, key="btn_eco"):
+            if aciklama and tutar > 0:
+                islem_yap("ekle", urun=aciklama, tip="BUTCE", mesaj=str(tutar), durum=tur, zaman=datetime.now().strftime("%Y-%m-%d")); st.rerun()
+        
+        # Bütçe Özeti
+        df_b = st.session_state.local_df[st.session_state.local_df["Tip"] == "BUTCE"]
+        if not df_b.empty:
+            df_b["Tutar_Sayi"] = pd.to_numeric(df_b["Mesaj"], errors='coerce').fillna(0)
+            gelir = df_b[df_b["Durum"]=="Gelir"]["Tutar_Sayi"].sum()
+            gider = df_b[df_b["Durum"]=="Gider"]["Tutar_Sayi"].sum()
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Gelir", f"{gelir:.0f}₺"); c2.metric("Gider", f"{gider:.0f}₺"); c3.metric("Kalan", f"{gelir-gider:.0f}₺")
+            st.dataframe(df_b[["Zaman", "Urun", "Mesaj", "Durum"]], use_container_width=True, hide_index=True)
+
+    with tab2: # YATIRIMLAR
+        if GRAFIK_VAR:
+            df_y = st.session_state.local_df[st.session_state.local_df["Tip"] == "YATIRIM"]
+            with st.expander("➕ Varlık Ekle"):
+                y_ad = st.text_input("Varlık Adı")
+                y_deg = st.number_input("Değer (TL)")
+                if st.button("Ekle") and y_ad:
+                    islem_yap("ekle", urun=y_ad, tip="YATIRIM", mesaj=str(y_deg)); st.rerun()
+
+            if not df_y.empty:
+                df_y["Deger"] = pd.to_numeric(df_y["Mesaj"], errors='coerce').fillna(0)
+                fig = px.pie(df_y, values='Deger', names='Urun', title='Varlık Dağılımı', hole=0.4)
+                st.plotly_chart(fig, use_container_width=True)
+                for i, row in df_y.iterrows():
+                    c1, c2 = st.columns([0.8, 0.2])
+                    with c1: st.write(f"💎 **{row['Urun']}**: {row['Mesaj']} ₺")
+                    with c2: 
+                         if st.button("Sil", key=f"ydel_{i}"): islem_yap("sil", urun=row['Urun']); st.rerun()
+            else: st.info("Yatırım ekleyin.")
+        else: st.warning("Grafikler için 'plotly' gerekli.")
+
+def karsilama_paneli():
+    if random.random() < 0.25:
+        soz = random.choice(prenses_sozleri())
+        css, title = "prenses-box", "🐾 PRENSES!"
+    else:
+        soz = random.choice(ask_kavanozu_sozleri())
+        css, title = "welcome-box", "Hoşgeldiniz! 🏡"
+    st.markdown(f'<div class="{css}"><div class="welcome-title">{title}</div><div class="welcome-note">{soz}</div></div>', unsafe_allow_html=True)
+
+def prenses_sozleri():
+    return ["🐾 Mama kabım boş!", "🐾 Koltuğumdan kalk!", "🐾 Beni sev!", "🐾 Tüy döktüm, süpür!", "🐾 Evin reisi benim."]
+
+def ask_kavanozu_sozleri():
+    return ["Seninle her şey güzel.", "Çaylar benden!", "Gülüşün harika.", "İyi ki varsın.", "Evimizin neşesisin."]
 
 # ==============================================================================
-# ÇALIŞTIRMA
+# 🚀 UYGULAMA BAŞLATICI
 # ==============================================================================
-karsilama_paneli()
-dashboard_goster()
-
 with st.sidebar:
-    st.header("Menü")
-    secim = st.radio("Git:", ["🏠 Ana Sayfa", "🍽️ Yemekler", "💰 Ekonomi", "🧬 Yaşam", "📂 Dosya"])
-    st.markdown("---"); st.header("Linkler")
-    st.markdown('<a href="https://www.turkiye.gov.tr/" target="_blank" class="link-box">🏛️ E-Devlet</a>', unsafe_allow_html=True)
-    st.markdown('<a href="https://www.enabiz.gov.tr/" target="_blank" class="link-box">🏥 E-Nabız</a>', unsafe_allow_html=True)
+    st.title("🏡 Ev Asistanı")
+    st.caption("v2.1 Full")
+    menu = st.radio("Menü", ["Ana Ekran", "Yemek & Mutfak", "Ekonomi", "Yaşam", "Dosya"])
+    st.markdown("---")
+    st.info(f"Mod: {'🟢 Online' if ONLINE_MOD else '🔴 Offline'}")
 
-if secim == "🏠 Ana Sayfa": sayfa_ana_ekran()
-elif secim == "🍽️ Yemekler": sayfa_yemekler()
-elif secim == "💰 Ekonomi": sayfa_ekonomi()
-elif secim == "🧬 Yaşam": sayfa_yasam()
-elif secim == "📂 Dosya": sayfa_dosya()
+if menu == "Ana Ekran": sayfa_ana_ekran()
+elif menu == "Yemek & Mutfak": sayfa_yemek()
+elif menu == "Ekonomi": sayfa_ekonomi()
+elif menu == "Yaşam": sayfa_yasam()
+elif menu == "Dosya": sayfa_dosya()
