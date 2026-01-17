@@ -429,10 +429,12 @@ with tab1:
 
     st.markdown("---")
 
-    # --- ALINACAKLAR ---
     alinacaklar = df_market[df_market["Durum"] == "0"]
-        st.subheader("📌 Alınacaklar Listesi")
-        if alinacaklar.empty: st.success("Sepet Boş! 🎉")
+
+    st.subheader("📌 Alınacaklar Listesi")
+    if alinacaklar.empty:
+        st.success("Sepet Boş! 🎉")
+
         
         kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
         if "Genel" in kategori_listesi: kategori_listesi.remove("Genel"); kategori_listesi.append("Genel")
@@ -745,6 +747,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
