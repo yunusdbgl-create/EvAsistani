@@ -381,8 +381,8 @@ def sayfa_ana_ekran():
 # 🛒 MARKET
 # ======================================================================
     with tab1:
-        df = st.session_state.local_df
-        df_market = df[df["Tip"] == "MARKET"]
+            df = st.session_state.local_df
+            df_market = df[df["Tip"] == "MARKET"]
 
         VARSAYILAN_KATEGORILER = [
             "🍏 Meyve & Sebze",
@@ -775,6 +775,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
