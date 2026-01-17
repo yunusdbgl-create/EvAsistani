@@ -468,6 +468,9 @@ def sayfa_ana_ekran():
                                 silme_butonu_koy(f"m_{i}", row["Urun"])
 
 # ---- ALINANLAR (KATEGORİLİ)
+df_market = st.session_state.local_df[
+    st.session_state.local_df["Tip"] == "MARKET"
+]
 st.divider()
 tamamlananlar = df_market[df_market["Durum"] == "1"]
 
@@ -846,6 +849,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
