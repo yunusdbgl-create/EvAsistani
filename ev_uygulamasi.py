@@ -558,7 +558,7 @@ def sayfa_ana_ekran():
     
     st.markdown("---")
 
-        is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
+    is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
         if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
         st.subheader("📌 Yapılacaklar Listesi")
         for kat in is_listesi:
@@ -824,6 +824,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
