@@ -356,8 +356,8 @@ def dashboard_goster():
     sepet_sayisi = len(df[(df["Tip"] == "MARKET") & (df["Durum"] == "0")])
 
     c1, c2 = st.columns(2)
-    c1.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
-    c2.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
+st.metric("🧾 Sıradaki Ödeme", siradaki_fatura, kalan_gun_txt)
+st.metric("🛒 Sepet", f"{sepet_sayisi} Ürün")
     st.markdown("---")
 
 # ==============================================================================
@@ -381,10 +381,20 @@ def sayfa_ana_ekran():
         kayitli_kategoriler = {k for k in set(df_market["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]}
         TUM_KATEGORILER = sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler)) + ["✏️ Yeni Kategori Yaz"]
         
-        c1, c2, c3 = st.columns([0.40, 0.40, 0.20], gap="small", vertical_alignment="bottom")
-        with c1: st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
-        with c2: st.selectbox("Kategori", TUM_KATEGORILER, key="market_kategori_secim", label_visibility="collapsed")
-        with c3: st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
+c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
+with c1:
+    st.text_input("Ürün", key="market_giris", label_visibility="collapsed", placeholder="Ürün Adı...")
+with c2:
+    st.button("EKLE", key="btn_m", on_click=market_ekleme_callback, use_container_width=True)
+
+# 👇 ALT SATIR
+st.selectbox(
+    "Kategori",
+    TUM_KATEGORILER,
+    key="market_kategori_secim",
+    label_visibility="collapsed"
+)
+
         
         if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
             st.text_input("Yeni Kategori Adı:", key="market_kategori_yeni", placeholder="Örn: Tekne")
