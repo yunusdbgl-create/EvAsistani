@@ -376,8 +376,8 @@ def sayfa_ana_ekran():
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
     
     with tab1:
-    df = st.session_state.local_df
-    df_market = df[df["Tip"] == "MARKET"]
+        df = st.session_state.local_df
+        df_market = df[df["Tip"] == "MARKET"]
 
     # ======================
     # KATEGORİLER
@@ -794,6 +794,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
