@@ -517,62 +517,108 @@ def sayfa_ana_ekran():
 
 
     with tab2:
-        df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
-        VARSAYILAN_IS = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba"]
-        kayitli_is = {k for k in set(df_todo["Mesaj"].dropna().unique()) if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]}
-        TUM_ISLER = sorted(list(set(VARSAYILAN_IS) | kayitli_is)) + ["✏️ Yeni Kategori Yaz"]
+    # ======================
+    # VERİ
+    # ======================
+    df = st.session_state.local_df
+    df_todo = df[df["Tip"] == "TODO"]
 
-        # --- İŞ EKLEME (MOBİL UYUMLU) ---
+    # ======================
+    # KATEGORİLER
+    # ======================
+    VARSAYILAN_IS = ["🏠 Ev İçi", "🔧 Tamirat", "🏢 Dışarı İşleri", "🚗 Araba"]
 
-    # 1️⃣ İş adı (üst satır)
+    kayitli_is = {
+        k for k in set(df_todo["Mesaj"].dropna().unique())
+        if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]
+    }
+
+    TUM_ISLER = (
+        sorted(list(set(VARSAYILAN_IS) | kayitli_is))
+        + ["✏️ Yeni Kategori Yaz"]
+    )
+
+    # ======================
+    # İŞ EKLEME (MOBİL UYUMLU)
+    # ======================
     st.text_input(
         "Görev",
         key="is_giris",
-        label_visibility="collapsed",
-        placeholder="Yapılacak iş..."
+        placeholder="Yapılacak iş...",
+        label_visibility="collapsed"
     )
-    
-    # 2️⃣ Kategori (alt satır)
+
     st.selectbox(
         "Kategori",
         TUM_ISLER,
         key="is_kategori_secim",
         label_visibility="collapsed"
     )
-    
-    # Yeni kategori yazımı
+
     if st.session_state.is_kategori_secim == "✏️ Yeni Kategori Yaz":
         st.text_input(
-            "Yeni Kategori Adı:",
+            "Yeni Kategori Adı",
             key="is_kategori_yeni",
             placeholder="Örn: Bahçe"
         )
-    
-    # 3️⃣ EKLE butonu (en alt – tam genişlik)
+
     st.button(
         "EKLE",
         key="btn_t",
         on_click=is_ekleme_callback,
         use_container_width=True
     )
-    
+
     st.markdown("---")
 
+    # ======================
+    # YAPILACAKLAR
+    # ======================
     is_listesi = sorted(list(set(TUM_ISLER[:-1]) | {"Genel"}))
-        if "Genel" in is_listesi: is_listesi.remove("Genel"); is_listesi.append("Genel")
-        st.subheader("📌 Yapılacaklar Listesi")
-        for kat in is_listesi:
-            if kat == "Genel": items = df_todo[(df_todo["Durum"] == "0") & ((df_todo["Mesaj"] == "") | (df_todo["Mesaj"] == "Genel") | (df_todo["Mesaj"] == "None"))]
-            else: items = df_todo[(df_todo["Durum"] == "0") & (df_todo["Mesaj"] == kat)]
-            if not items.empty:
-                renk = get_kategori_renk(kat)
-                with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
-                    for i, row in items.iterrows():
-                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                        with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
+    if "Genel" in is_listesi:
+        is_listesi.remove("Genel")
+        is_listesi.append("Genel")
+
+    st.subheader("📌 Yapılacaklar Listesi")
+
+    for kat in is_listesi:
+        if kat == "Genel":
+            items = df_todo[
+                (df_todo["Durum"] == "0") &
+                (
+                    (df_todo["Mesaj"].isna()) |
+                    (df_todo["Mesaj"] == "") |
+                    (df_todo["Mesaj"] == "Genel") |
+                    (df_todo["Mesaj"] == "None")
+                )
+            ]
+        else:
+            items = df_todo[
+                (df_todo["Durum"] == "0") &
+                (df_todo["Mesaj"] == kat)
+            ]
+
+        if not items.empty:
+            renk = get_kategori_renk(kat)
+            with st.expander(f"{kat} ({len(items)})", expanded=True):
+                st.markdown(
+                    f"<div style='height:3px; background:{renk}; border-radius:5px; margin-bottom:10px;'></div>",
+                    unsafe_allow_html=True
+                )
+
+                for i, row in items.iterrows():
+                    c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
+
+                    with c1:
+                        if st.checkbox(
+                            f"**{row['Urun']}**",
+                            key=f"chk_t_{i}"
+                        ):
+                            hizli_durum_degistir(row["Urun"], "1")
+                            st.rerun()
+
+                    with c2:
+                        silme_butonu_koy(f"t_{i}", row["Urun"])
 
     with tab3:
         with st.form("alarm"):
@@ -824,6 +870,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
