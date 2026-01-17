@@ -375,10 +375,13 @@ def sayfa_ana_ekran():
 
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
     
-    with tab1:
-        df = st.session_state.local_df
-        df_market = df[df["Tip"] == "MARKET"]
+with tab1:
+    df = st.session_state.local_df
+    df_market = df[df["Tip"] == "MARKET"]
 
+    # ======================
+    # KATEGORİLER
+    # ======================
     VARSAYILAN_KATEGORILER = [
         "🍏 Meyve & Sebze",
         "🥩 Et & Şarküteri",
@@ -398,14 +401,16 @@ def sayfa_ana_ekran():
         + ["✏️ Yeni Kategori Yaz"]
     )
 
-    # --- ÜRÜN EKLEME ---
+    # ======================
+    # ÜRÜN EKLEME (MOBİL UYUMLU)
+    # ======================
     c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
     with c1:
         st.text_input(
             "Ürün",
             key="market_giris",
-            label_visibility="collapsed",
-            placeholder="Ürün Adı..."
+            placeholder="Ürün Adı...",
+            label_visibility="collapsed"
         )
     with c2:
         st.button(
@@ -424,52 +429,92 @@ def sayfa_ana_ekran():
 
     if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
         st.text_input(
-            "Yeni Kategori Adı:",
+            "Yeni Kategori Adı",
             key="market_kategori_yeni",
             placeholder="Örn: Tekne"
         )
 
     st.markdown("---")
 
+    # ======================
+    # ALINACAKLAR
+    # ======================
     alinacaklar = df_market[df_market["Durum"] == "0"]
-
     st.subheader("📌 Alınacaklar Listesi")
+
     if alinacaklar.empty:
         st.success("Sepet Boş! 🎉")
-
-        
-        kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
-        if "Genel" in kategori_listesi: kategori_listesi.remove("Genel"); kategori_listesi.append("Genel")
+    else:
+        kategori_listesi = sorted(
+            list(set(TUM_KATEGORILER[:-1]) | {"Genel"})
+        )
+        if "Genel" in kategori_listesi:
+            kategori_listesi.remove("Genel")
+            kategori_listesi.append("Genel")
 
         for kat in kategori_listesi:
-            if kat == "Genel": items = alinacaklar[(alinacaklar["Mesaj"] == "") | (alinacaklar["Mesaj"] == "Genel") | (alinacaklar["Mesaj"] == "None")]
-            else: items = alinacaklar[alinacaklar["Mesaj"] == kat]
-            
+            if kat == "Genel":
+                items = alinacaklar[
+                    (alinacaklar["Mesaj"].isna()) |
+                    (alinacaklar["Mesaj"] == "") |
+                    (alinacaklar["Mesaj"] == "Genel") |
+                    (alinacaklar["Mesaj"] == "None")
+                ]
+            else:
+                items = alinacaklar[alinacaklar["Mesaj"] == kat]
+
             if not items.empty:
                 renk = get_kategori_renk(kat)
                 with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    st.markdown(f"<div style='height:3px; background-color:{renk}; border-radius:5px; margin-bottom:10px;'></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div style='height:3px;background:{renk};border-radius:5px;margin-bottom:10px;'></div>",
+                        unsafe_allow_html=True
+                    )
                     for i, row in items.iterrows():
-                        c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                        with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
+                        a, b = st.columns([0.8, 0.2], gap="small")
+                        with a:
+                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"):
+                                hizli_durum_degistir(row["Urun"], "1")
+                                st.rerun()
+                        with b:
+                            silme_butonu_koy(f"m_{i}", row["Urun"])
 
-        st.divider()
-        tamamlananlar = df_market[df_market["Durum"] == "1"]
-        with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
-            if tamamlananlar.empty: st.info("Geçmiş boş.")
-            else:
-                for kat in kategori_listesi:
-                    if kat == "Genel": items = tamamlananlar[(tamamlananlar["Mesaj"] == "") | (tamamlananlar["Mesaj"] == "Genel") | (tamamlananlar["Mesaj"] == "None")]
-                    else: items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
-                    if not items.empty:
-                        with st.expander(f"{kat} ({len(items)})"):
-                            for i, row in items.iterrows():
-                                c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
-                                with c1:
-                                    if st.button(f"➕ {row['Urun']}", key=f"back_m_{i}", use_container_width=True): hizli_durum_degistir(row['Urun'], "0"); st.rerun()
-                                with c2: silme_butonu_koy(f"fin_m_{i}", row['Urun'])
+    # ======================
+    # GEÇMİŞ / ALINANLAR
+    # ======================
+    tamamlananlar = df_market[df_market["Durum"] == "1"]
+    st.divider()
+
+    with st.expander(f"📦 Geçmiş / Alınanlar ({len(tamamlananlar)})", expanded=False):
+        if tamamlananlar.empty:
+            st.info("Geçmiş boş.")
+        else:
+            for kat in kategori_listesi:
+                if kat == "Genel":
+                    items = tamamlananlar[
+                        (tamamlananlar["Mesaj"].isna()) |
+                        (tamamlananlar["Mesaj"] == "") |
+                        (tamamlananlar["Mesaj"] == "Genel") |
+                        (tamamlananlar["Mesaj"] == "None")
+                    ]
+                else:
+                    items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
+
+                if not items.empty:
+                    with st.expander(f"{kat} ({len(items)})"):
+                        for i, row in items.iterrows():
+                            a, b = st.columns([0.8, 0.2], gap="small")
+                            with a:
+                                if st.button(
+                                    f"➕ {row['Urun']}",
+                                    key=f"back_m_{i}",
+                                    use_container_width=True
+                                ):
+                                    hizli_durum_degistir(row["Urun"], "0")
+                                    st.rerun()
+                            with b:
+                                silme_butonu_koy(f"fin_m_{i}", row["Urun"])
+
 
     with tab2:
         df_todo = st.session_state.local_df[st.session_state.local_df["Tip"] == "TODO"]
@@ -749,6 +794,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
