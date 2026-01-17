@@ -381,91 +381,91 @@ def sayfa_ana_ekran():
     # 🛒 MARKET
     # ======================================================================
     with tab1:
-        df = st.session_state.local_df
-        df_market = df[df["Tip"] == "MARKET"]
-
-        VARSAYILAN_KATEGORILER = [
-            "🍏 Meyve & Sebze",
-            "🥩 Et & Şarküteri",
-            "🥛 Süt & Kahvaltılık",
-            "🍞 Gıda & Bakliyat",
-            "🧹 Temizlik",
-            "🍫 Atıştırmalık"
-        ]
-
-        kayitli_kategoriler = {
-            k for k in set(df_market["Mesaj"].dropna().unique())
-            if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]
-        }
-
-        TUM_KATEGORILER = (
-            sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler))
-            + ["✏️ Yeni Kategori Yaz"]
-        )
-
-# ======================
-# ÜRÜN EKLEME (ALT ALTA - MOBİL UYUMLU)
-# ======================
-st.text_input(
+    df = st.session_state.local_df
+    df_market = df[df["Tip"] == "MARKET"]
+    
+    VARSAYILAN_KATEGORILER = [
+    "🍏 Meyve & Sebze",
+    "🥩 Et & Şarküteri",
+    "🥛 Süt & Kahvaltılık",
+    "🍞 Gıda & Bakliyat",
+    "🧹 Temizlik",
+    "🍫 Atıştırmalık"
+    ]
+    
+    kayitli_kategoriler = {
+    k for k in set(df_market["Mesaj"].dropna().unique())
+    if k and k not in ["Genel", "None", "✏️ Yeni Kategori Yaz"]
+    }
+    
+    TUM_KATEGORILER = (
+    sorted(list(set(VARSAYILAN_KATEGORILER) | kayitli_kategoriler))
+    + ["✏️ Yeni Kategori Yaz"]
+    )
+    
+    # ======================
+    # ÜRÜN EKLEME (ALT ALTA - MOBİL UYUMLU)
+    # ======================
+    st.text_input(
     "Ürün",
     key="market_giris",
     placeholder="Ürün Adı...",
     label_visibility="collapsed"
-)
-
-st.selectbox(
+    )
+    
+    st.selectbox(
     "Kategori",
     TUM_KATEGORILER,
     key="market_kategori_secim",
     label_visibility="collapsed"
-)
-
-if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
-    st.text_input(
-        "Yeni Kategori Adı",
-        key="market_kategori_yeni",
-        placeholder="Örn: Tekne"
     )
-
-st.button(
+    
+    if st.session_state.market_kategori_secim == "✏️ Yeni Kategori Yaz":
+    st.text_input(
+    "Yeni Kategori Adı",
+    key="market_kategori_yeni",
+    placeholder="Örn: Tekne"
+    )
+    
+    st.button(
     "EKLE",
     key="btn_m",
     on_click=market_ekleme_callback,
     use_container_width=True
-)
-
-st.markdown("---")
-
-
-        alinacaklar = df_market[df_market["Durum"] == "0"]
-        st.subheader("📌 Alınacaklar Listesi")
-
-        kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
-        if "Genel" in kategori_listesi:
-            kategori_listesi.remove("Genel")
-            kategori_listesi.append("Genel")
-
-        for kat in kategori_listesi:
-            if kat == "Genel":
-                items = alinacaklar[
-                    (alinacaklar["Mesaj"].isna()) |
-                    (alinacaklar["Mesaj"] == "") |
-                    (alinacaklar["Mesaj"] == "Genel") |
-                    (alinacaklar["Mesaj"] == "None")
-                ]
-            else:
-                items = alinacaklar[alinacaklar["Mesaj"] == kat]
-
-            if not items.empty:
-                with st.expander(f"{kat} ({len(items)})", expanded=True):
-                    for i, row in items.iterrows():
-                        a, b = st.columns([0.8, 0.2])
-                        with a:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"):
-                                hizli_durum_degistir(row["Urun"], "1")
-                                st.rerun()
-                        with b:
-                            silme_butonu_koy(f"m_{i}", row["Urun"])
+    )
+    
+    st.markdown("---")
+    
+    
+    alinacaklar = df_market[df_market["Durum"] == "0"]
+    st.subheader("📌 Alınacaklar Listesi")
+    
+    kategori_listesi = sorted(list(set(TUM_KATEGORILER[:-1]) | {"Genel"}))
+    if "Genel" in kategori_listesi:
+    kategori_listesi.remove("Genel")
+    kategori_listesi.append("Genel")
+    
+    for kat in kategori_listesi:
+    if kat == "Genel":
+    items = alinacaklar[
+    (alinacaklar["Mesaj"].isna()) |
+    (alinacaklar["Mesaj"] == "") |
+    (alinacaklar["Mesaj"] == "Genel") |
+    (alinacaklar["Mesaj"] == "None")
+    ]
+    else:
+    items = alinacaklar[alinacaklar["Mesaj"] == kat]
+    
+    if not items.empty:
+    with st.expander(f"{kat} ({len(items)})", expanded=True):
+    for i, row in items.iterrows():
+    a, b = st.columns([0.8, 0.2])
+    with a:
+    if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"):
+    hizli_durum_degistir(row["Urun"], "1")
+    st.rerun()
+    with b:
+    silme_butonu_koy(f"m_{i}", row["Urun"])
 
     # ======================================================================
     # 📝 İŞLER
@@ -770,6 +770,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
