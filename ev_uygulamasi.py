@@ -467,20 +467,35 @@ def sayfa_ana_ekran():
                             with c2:
                                 silme_butonu_koy(f"m_{i}", row["Urun"])
 
-        # ---- ALINANLAR
-        st.divider()
-        tamamlananlar = df_market[df_market["Durum"] == "1"]
+# ---- ALINANLAR (KATEGORİLİ)
+st.divider()
+tamamlananlar = df_market[df_market["Durum"] == "1"]
 
-        with st.expander(f"📦 Alınanlar ({len(tamamlananlar)})", expanded=False):
-            if tamamlananlar.empty:
-                st.info("Henüz alınan yok.")
+with st.expander(f"📦 Alınanlar ({len(tamamlananlar)})", expanded=False):
+
+    if tamamlananlar.empty:
+        st.info("Henüz alınan yok.")
+    else:
+        for kat in kategori_listesi:
+            if kat == "Genel":
+                items = tamamlananlar[
+                    (tamamlananlar["Mesaj"].isna()) |
+                    (tamamlananlar["Mesaj"] == "") |
+                    (tamamlananlar["Mesaj"] == "Genel") |
+                    (tamamlananlar["Mesaj"] == "None")
+                ]
             else:
-                for i, row in tamamlananlar.iterrows():
-                    c1, c2 = st.columns([0.8, 0.2])
-                    with c1:
-                        st.write(f"✅ {row['Urun']}")
-                    with c2:
-                        silme_butonu_koy(f"fin_m_{i}", row["Urun"])
+                items = tamamlananlar[tamamlananlar["Mesaj"] == kat]
+
+            if not items.empty:
+                with st.expander(f"{kat} ({len(items)})"):
+                    for i, row in items.iterrows():
+                        c1, c2 = st.columns([0.8, 0.2])
+                        with c1:
+                            st.write(f"✅ {row['Urun']}")
+                        with c2:
+                            silme_butonu_koy(f"fin_m_{i}", row["Urun"])
+
 
     # ======================================================
     # 📝 İŞLER
@@ -831,6 +846,7 @@ elif secim == "🍽️ Yemekler": sayfa_yemekler()
 elif secim == "💰 Ekonomi": sayfa_ekonomi()
 elif secim == "🧬 Yaşam": sayfa_yasam()
 elif secim == "📂 Dosya": sayfa_dosya()
+
 
 
 
