@@ -51,6 +51,14 @@ st.markdown("""
         color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
     }
     .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
+    
+    /* Sidebar linkler */
+    .link-box {
+        display: block; padding: 8px 12px; margin: 4px 0; border-radius: 8px;
+        background: rgba(102, 126, 234, 0.15); color: #4a69bd; text-decoration: none;
+        font-weight: 500; transition: background 0.2s;
+    }
+    .link-box:hover { background: rgba(102, 126, 234, 0.25); color: #2c3e50; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -170,26 +178,36 @@ def get_client():
     return gspread.authorize(creds)
 
 def arka_planda_ekle(satir):
-    try: get_client().open(DOSYA_ADI).sheet1.append_row(satir)
-    except: pass
+    try:
+        get_client().open(DOSYA_ADI).sheet1.append_row(satir)
+    except Exception:
+        pass
 
 def arka_planda_sil(urun):
     try:
         sheet = get_client().open(DOSYA_ADI).sheet1
-        try: sheet.delete_rows(sheet.find(urun).row)
-        except:
+        try:
+            sheet.delete_rows(sheet.find(urun).row)
+        except Exception:
             for i, row in enumerate(sheet.get_all_values()):
-                if row[0] == urun: sheet.delete_rows(i+1); break
-    except: pass
+                if row and row[0] == urun:
+                    sheet.delete_rows(i + 1)
+                    break
+    except Exception:
+        pass
 
 def arka_planda_guncelle(urun, durum):
     try:
         sheet = get_client().open(DOSYA_ADI).sheet1
-        try: sheet.update_cell(sheet.find(urun).row, 2, str(durum))
-        except:
+        try:
+            sheet.update_cell(sheet.find(urun).row, 2, str(durum))
+        except Exception:
             for i, row in enumerate(sheet.get_all_values()):
-                if row[0] == urun: sheet.update_cell(i+1, 2, str(durum)); break
-    except: pass
+                if row and len(row) >= 1 and row[0] == urun:
+                    sheet.update_cell(i + 1, 2, str(durum))
+                    break
+    except Exception:
+        pass
 
 def arka_planda_guncelle_yatirim(urun, miktar, notlar, tip):
     try:
@@ -198,23 +216,27 @@ def arka_planda_guncelle_yatirim(urun, miktar, notlar, tip):
         bulundu = False
         tum_veriler = sheet.get_all_values()
         for i, row in enumerate(tum_veriler):
-            if row[0] == urun and row[4] == tip:
-                sheet.update_cell(i + 1, 2, datetime.now().strftime("%Y-%m-%d")) 
+            if len(row) >= 5 and row[0] == urun and row[4] == tip:
+                sheet.update_cell(i + 1, 2, datetime.now().strftime("%Y-%m-%d"))
                 sheet.update_cell(i + 1, 3, str(miktar))
                 sheet.update_cell(i + 1, 4, str(notlar))
                 bulundu = True
                 break
-        if not bulundu: sheet.append_row([urun, datetime.now().strftime("%Y-%m-%d"), str(miktar), notlar, tip])
-    except: pass
+        if not bulundu:
+            sheet.append_row([urun, datetime.now().strftime("%Y-%m-%d"), str(miktar), notlar, tip])
+    except Exception:
+        pass
 
 def verileri_yukle():
     try:
         data = get_client().open(DOSYA_ADI).sheet1.get_all_values()
-        if not data or "Urun" not in data[0]: return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
+        if not data or "Urun" not in data[0]:
+            return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
         df = pd.DataFrame(data[1:], columns=data[0]).astype(str)
-        df = df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
+        df = df.drop_duplicates(subset=["Urun", "Tip"], keep="first")
         return df
-    except: return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
+    except Exception:
+        return pd.DataFrame(columns=["Urun", "Durum", "Mesaj", "Zaman", "Tip"])
 
 if 'local_df' not in st.session_state: st.session_state.local_df = verileri_yukle()
 
@@ -252,9 +274,13 @@ def hizli_yatirim_guncelle(isim, miktar, notlar):
         threading.Thread(target=arka_planda_guncelle_yatirim, args=(isim, miktar, notlar, "YATIRIM")).start()
 
 def listeyi_temizle():
-    st.session_state.local_df = st.session_state.local_df.drop_duplicates(subset=['Urun', 'Tip'], keep='first')
+    st.session_state.local_df = st.session_state.local_df.drop_duplicates(subset=["Urun", "Tip"], keep="first")
     st.toast("🧹 Liste temizlendi!")
-    time.sleep(1)
+    st.rerun()
+
+def verileri_yenile():
+    st.session_state.local_df = verileri_yukle()
+    st.toast("🔄 Veriler Google Sheets'ten yenilendi!")
     st.rerun()
 
 # CALLBACKLER
@@ -303,15 +329,23 @@ def sayac_callback():
     if ad: hizli_ekle(ad, "COUNTDOWN", zaman=str(tarih)); st.session_state.sayac_ad = ""
 
 def fatura_callback():
-    ad, gun, saat, tekrar = st.session_state.fat_ad, st.session_state.fat_gun, st.session_state.fat_saat, st.session_state.fat_tekrar
-    if ad:
+    ad = st.session_state.get("fat_ad", "")
+    gun = st.session_state.get("fat_gun", 1)
+    saat = st.session_state.get("fat_saat", dt_time(9, 0))
+    tekrar = st.session_state.get("fat_tekrar", "🔁 Her Ay")
+    if ad and str(ad).strip():
         kod = "HER_AY" if tekrar == "🔁 Her Ay" else "TEK"
-        hizli_ekle(ad, "FATURA", gun, str(saat)[0:5], kod)
+        hizli_ekle(ad.strip(), "FATURA", zaman=str(gun), mesaj=str(saat)[:5], durum=kod)
         st.session_state.fat_ad = ""
 
 def butce_callback():
-    ad, tutar, tur = st.session_state.butce_ad, st.session_state.butce_tutar, st.session_state.butce_tur
-    if ad and tutar > 0: hizli_ekle(ad, "BUTCE", mesaj=str(tutar), durum=tur, zaman=datetime.now().strftime("%Y-%m-%d")); st.session_state.butce_ad = ""; st.session_state.butce_tutar = 0
+    ad = st.session_state.get("butce_ad", "")
+    tutar = st.session_state.get("butce_tutar", 0) or 0
+    tur = st.session_state.get("butce_tur", "Gider")
+    if ad and str(ad).strip() and tutar > 0:
+        hizli_ekle(ad.strip(), "BUTCE", mesaj=str(tutar), durum=tur, zaman=datetime.now().strftime("%Y-%m-%d"))
+        st.session_state.butce_ad = ""
+        st.session_state.butce_tutar = 0
 
 def yatirim_callback():
     ad, miktar, notlar = st.session_state.yat_ad, st.session_state.yat_mik, st.session_state.yat_not
@@ -320,8 +354,15 @@ def yatirim_callback():
 def alarm_kur(mesaj, sure):
     hedef = datetime.now() + timedelta(minutes=sure)
     hizli_ekle(f"{mesaj} ({hedef.strftime('%H:%M')})", "ALARM", hedef.strftime("%Y-%m-%d %H:%M:%S"), mesaj, "-1")
-    try: requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=f"✅ Alarm: {sure} dk sonra '{mesaj}'".encode('utf-8'), headers={"Title": "Ev Asistanı".encode('utf-8'), "Priority": "high"})
-    except: pass
+    try:
+        requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=f"✅ Alarm: {sure} dk sonra '{mesaj}'".encode("utf-8"),
+            headers={"Title": "Ev Asistanı".encode("utf-8"), "Priority": "high"},
+            timeout=5,
+        )
+    except Exception:
+        pass
 
 def silme_butonu_koy(prefix, urun):
     if not st.session_state.get(f"conf_{prefix}_{urun}"):
@@ -339,11 +380,12 @@ def dashboard_goster():
     df = st.session_state.local_df
     
     # Sıradaki Fatura
-    df_f = df[df["Tip"] == "FATURA"]
-    siradaki_fatura = "Yok"; kalan_gun_txt = ""
+    df_f = df[df["Tip"] == "FATURA"].copy()
+    siradaki_fatura = "Yok"
+    kalan_gun_txt = ""
     if not df_f.empty:
         bugun = datetime.now().day
-        df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32)
+        df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors="coerce").fillna(32)
         df_f = df_f.sort_values("Gun_Sayi")
         for _, row in df_f.iterrows():
             kalan = int(row["Gun_Sayi"]) - bugun
@@ -369,7 +411,6 @@ def sayfa_ana_ekran():
         st.balloons()
         soz = random.choice(ask_kavanozu_sozleri())
         st.success(f"💌 {soz}")
-        time.sleep(3)
 
     tab1, tab2, tab3 = st.tabs(["🛒 MARKET", "📝 İŞLER", "⏰ ALARM"])
     
@@ -409,8 +450,13 @@ def sayfa_ana_ekran():
                     for i, row in items.iterrows():
                         c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
                         with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_m_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"m_{i}", row['Urun'])
+                            alindi = (row["Durum"] == "1")
+                            new_val = st.checkbox(f"**{row['Urun']}**", value=alindi, key=f"chk_m_{i}")
+                            if new_val != alindi:
+                                hizli_durum_degistir(row["Urun"], "1" if new_val else "0")
+                                st.rerun()
+                        with c2:
+                            silme_butonu_koy(f"m_{i}", row["Urun"])
 
         st.divider()
         tamamlananlar = df_market[df_market["Durum"] == "1"]
@@ -453,14 +499,22 @@ def sayfa_ana_ekran():
                     for i, row in items.iterrows():
                         c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
                         with c1:
-                            if st.checkbox(f"**{row['Urun']}**", key=f"chk_t_{i}"): hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                        with c2: silme_butonu_koy(f"t_{i}", row['Urun'])
+                            yapildi = (row["Durum"] == "1")
+                            new_val = st.checkbox(f"**{row['Urun']}**", value=yapildi, key=f"chk_t_{i}")
+                            if new_val != yapildi:
+                                hizli_durum_degistir(row["Urun"], "1" if new_val else "0")
+                                st.rerun()
+                        with c2:
+                            silme_butonu_koy(f"t_{i}", row["Urun"])
 
     with tab3:
         with st.form("alarm"):
             mesaj = st.text_input("Not", placeholder="Fırın...")
             sure = st.number_input("Dakika", min_value=1, value=15)
-            if st.form_submit_button("🔔 Kur", use_container_width=True): alarm_kur(mesaj, sure); st.success("Kuruldu!"); time.sleep(1); st.rerun()
+            if st.form_submit_button("🔔 Kur", use_container_width=True):
+                alarm_kur(mesaj or "Alarm", sure)
+                st.success("Alarm kuruldu!")
+                st.rerun()
         df_a = st.session_state.local_df[st.session_state.local_df["Tip"] == "ALARM"]
         if not df_a.empty:
             st.markdown("---"); simdi = datetime.now()
@@ -483,10 +537,11 @@ def sayfa_ekonomi():
             with c2: st.time_input("Saat", dt_time(9,0), key="fat_saat"); st.radio("Sıklık", ["🔁 Her Ay", "1️⃣ Tek"], key="fat_tekrar")
             st.button("KAYDET", key="btn_fat_save", on_click=fatura_callback, use_container_width=True)
         st.markdown("---")
-        df_f = st.session_state.local_df[st.session_state.local_df["Tip"] == "FATURA"]
+        df_f = st.session_state.local_df[st.session_state.local_df["Tip"] == "FATURA"].copy()
         if not df_f.empty:
             bugun = datetime.now().day
-            df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors='coerce').fillna(32); df_f = df_f.sort_values("Gun_Sayi")
+            df_f["Gun_Sayi"] = pd.to_numeric(df_f["Zaman"], errors="coerce").fillna(32)
+            df_f = df_f.sort_values("Gun_Sayi")
             for i, row in df_f.iterrows():
                 try:
                     gun = int(row["Gun_Sayi"]); kalan = gun - bugun
@@ -592,12 +647,13 @@ def sayfa_yemekler():
         for i, row in df_k.iterrows():
             c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
             with c1:
-                chk = (row['Durum'] == "1")
-                if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"k_chk_{i}"):
-                    if not chk: hizli_durum_degistir(row['Urun'], "1")
-                else:
-                    if chk: hizli_durum_degistir(row['Urun'], "0")
-            with c2: silme_butonu_koy(f"k_del_{i}", row['Urun'])
+                chk = (row["Durum"] == "1")
+                new_val = st.checkbox(f"**{row['Urun']}**", value=chk, key=f"k_chk_{i}")
+                if new_val != chk:
+                    hizli_durum_degistir(row["Urun"], "1" if new_val else "0")
+                    st.rerun()
+            with c2:
+                silme_butonu_koy(f"k_del_{i}", row["Urun"])
 
     with tab3:
         c1, c2 = st.columns([0.75, 0.25], gap="small", vertical_alignment="bottom")
@@ -612,12 +668,13 @@ def sayfa_yemekler():
         for i, row in df_y.iterrows():
             c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
             with c1:
-                chk = (row['Durum'] == "1")
-                if st.checkbox(f"**{row['Urun']}**", value=chk, key=f"y_chk_{i}"):
-                    if not chk: hizli_durum_degistir(row['Urun'], "1")
-                else:
-                    if chk: hizli_durum_degistir(row['Urun'], "0")
-            with c2: silme_butonu_koy(f"y_del_{i}", row['Urun'])
+                chk = (row["Durum"] == "1")
+                new_val = st.checkbox(f"**{row['Urun']}**", value=chk, key=f"y_chk_{i}")
+                if new_val != chk:
+                    hizli_durum_degistir(row["Urun"], "1" if new_val else "0")
+                    st.rerun()
+            with c2:
+                silme_butonu_koy(f"y_del_{i}", row["Urun"])
 
     with tab4:
         st.subheader("👨‍🍳 AI Mutfak Şefi")
@@ -652,12 +709,13 @@ def sayfa_yasam():
         for i, row in df_r.iterrows():
             c1, c2 = st.columns([0.8, 0.2], gap="small", vertical_alignment="center")
             with c1:
-                is_done = (row['Durum'] == "1")
-                if st.checkbox(f"**{row['Urun']}**", value=is_done, key=f"r_chk_{i}"):
-                    if not is_done: hizli_durum_degistir(row['Urun'], "1"); st.rerun()
-                else:
-                    if is_done: hizli_durum_degistir(row['Urun'], "0"); st.rerun()
-            with c2: silme_butonu_koy(f"r_del_{i}", row['Urun'])
+                is_done = (row["Durum"] == "1")
+                new_val = st.checkbox(f"**{row['Urun']}**", value=is_done, key=f"r_chk_{i}")
+                if new_val != is_done:
+                    hizli_durum_degistir(row["Urun"], "1" if new_val else "0")
+                    st.rerun()
+            with c2:
+                silme_butonu_koy(f"r_del_{i}", row["Urun"])
 
     with tab2:
         with st.expander("➕ Yeni Sayaç", expanded=True):
@@ -684,9 +742,20 @@ def sayfa_yasam():
 
 def sayfa_dosya():
     st.subheader("📂 PDF Çevirici")
-    dosya = st.file_uploader("Resim Yükle", type=["png", "jpg", "jpeg"])
+    dosya = st.file_uploader("Resim Yükle", type=["png", "jpg", "jpeg"], help="Birden fazla resim seçersen hepsi tek PDF'de birleşir.")
     if dosya:
-        import img2pdf; st.download_button("⬇️ İndir", img2pdf.convert(dosya.read()), f"{dosya.name}.pdf", "application/pdf")
+        try:
+            import img2pdf
+            img_bytes = dosya.read()
+            if not img_bytes:
+                st.warning("Dosya boş.")
+            else:
+                pdf_bytes = img2pdf.convert(img_bytes)
+                st.download_button("⬇️ PDF İndir", pdf_bytes, f"{dosya.name.rsplit('.', 1)[0]}.pdf", "application/pdf", use_container_width=True)
+        except ImportError:
+            st.error("PDF oluşturmak için: `pip install img2pdf`")
+        except Exception as e:
+            st.error(f"Dönüştürme hatası: {e}")
 
 # ==============================================================================
 # ÇALIŞTIRMA
@@ -697,7 +766,11 @@ dashboard_goster()
 with st.sidebar:
     st.header("Menü")
     secim = st.radio("Git:", ["🏠 Ana Sayfa", "🍽️ Yemekler", "💰 Ekonomi", "🧬 Yaşam", "📂 Dosya"])
-    st.markdown("---"); st.header("Linkler")
+    st.markdown("---")
+    if st.button("🔄 Verileri Yenile", use_container_width=True, help="Google Sheets'ten güncel veriyi çeker"):
+        verileri_yenile()
+    st.markdown("---")
+    st.header("Linkler")
     st.markdown('<a href="https://www.turkiye.gov.tr/" target="_blank" class="link-box">🏛️ E-Devlet</a>', unsafe_allow_html=True)
     st.markdown('<a href="https://www.enabiz.gov.tr/" target="_blank" class="link-box">🏥 E-Nabız</a>', unsafe_allow_html=True)
 
