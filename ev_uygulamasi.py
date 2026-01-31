@@ -23,75 +23,32 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
-# --- CSS: Mobil uyumlu + modern tema ---
+# --- CSS: Mobil uyumlu, siyah ekran yapmayan tema ---
 st.markdown("""
 <style>
-    /* ========== MOBİL: Taşmayı engelle ========== */
-    html, body, #root, [data-testid="stAppViewContainer"] {
-        overflow-x: hidden !important;
-        max-width: 100vw !important;
-        position: relative;
-    }
+    /* Sadece yatay taşmayı engelle; arka plana dokunma (siyah ekran olmasın) */
+    html, body { overflow-x: hidden !important; max-width: 100vw !important; }
     .main .block-container {
         max-width: 100% !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
         padding-top: 1rem !important;
     }
-    section[data-testid="stSidebar"] { overflow-x: hidden !important; max-width: 100% !important; }
+    section[data-testid="stSidebar"] { overflow-x: hidden !important; }
     div[data-testid="stHorizontalBlock"] {
         flex-wrap: wrap !important;
         gap: 0.5rem !important;
         max-width: 100% !important;
     }
     div[data-testid="column"] {
-        display: flex; align-items: center; height: 100%;
-        min-width: 0 !important;  /* Flex çocuklarının taşmasını engeller */
-        max-width: 100% !important;
-    }
-    /* Form elemanları mobilde taşmasın */
-    input, select, textarea, [data-testid="stSelectbox"] > div, .stTextInput > div input {
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-    }
-    /* Tablolar ve geniş içerik: sadece içerik kayar, sayfa değil */
-    .stDataFrame, .stTable, [data-testid="stExpander"] {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-        max-width: 100% !important;
-    }
-    /* Metrik ve geniş bloklar */
-    [data-testid="stMetric"], [data-testid="column"] > div {
         min-width: 0 !important;
-        overflow: hidden !important;
-    }
-    button {
-        padding: 0.35rem 0.6rem !important;
         max-width: 100% !important;
-        font-size: 0.9rem !important;
     }
+    input, select, textarea { max-width: 100% !important; box-sizing: border-box !important; }
+    .stDataFrame, .stTable { overflow-x: auto !important; -webkit-overflow-scrolling: touch; max-width: 100% !important; }
+    button { padding: 0.35rem 0.6rem !important; font-size: 0.9rem !important; }
 
-    /* ========== TEMA: Sıcak & modern ========== */
-    :root {
-        --ana-mor: #6366f1;
-        --ana-acik: #818cf8;
-        --arka-plan: #faf8f5;
-        --kart-golge: 0 2px 12px rgba(99, 102, 241, 0.08);
-        --kart-kenar: 12px;
-    }
-    [data-testid="stAppViewContainer"] {
-        background: linear-gradient(160deg, #f0f4ff 0%, #faf8f5 50%, #fff8f0 100%) !important;
-    }
-    .main {
-        background: transparent !important;
-    }
-    /* Başlıklar */
-    h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        color: #1e1b4b !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em;
-    }
-    /* Karşılama kutuları */
+    /* Sadece kendi kutularımızı stilliyoruz; Streamlit arka planına dokunmuyoruz */
     .welcome-box {
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
         color: #fff !important;
@@ -100,7 +57,6 @@ st.markdown("""
         text-align: center;
         margin-bottom: 1.25rem;
         box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
-        border: none;
     }
     .prenses-box {
         background: linear-gradient(135deg, #f59e0b 0%, #d946ef 50%, #a855f7 100%);
@@ -114,19 +70,7 @@ st.markdown("""
     }
     .welcome-title { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.35rem; }
     .welcome-note { font-size: 0.95rem; opacity: 0.95; }
-    /* Expander / kartlar */
-    [data-testid="stExpander"] {
-        background: rgba(255,255,255,0.85);
-        border-radius: var(--kart-kenar);
-        box-shadow: var(--kart-golge);
-        border: 1px solid rgba(99, 102, 241, 0.12);
-    }
-    .streamlit-expanderHeader { font-weight: 600; color: #1e1b4b !important; font-size: 1rem; }
-    /* Sidebar */
-    section[data-testid="stSidebar"] > div {
-        background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%) !important;
-        border-right: 1px solid rgba(99, 102, 241, 0.1);
-    }
+
     .link-box {
         display: block;
         padding: 0.6rem 0.75rem;
@@ -136,17 +80,8 @@ st.markdown("""
         color: #4338ca !important;
         text-decoration: none;
         font-weight: 500;
-        transition: background 0.2s, transform 0.15s;
     }
     .link-box:hover { background: rgba(99, 102, 241, 0.2); color: #3730a3 !important; }
-    /* Butonlar */
-    .stButton > button {
-        border-radius: 10px !important;
-        font-weight: 600 !important;
-        transition: transform 0.15s, box-shadow 0.15s !important;
-    }
-    .stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important; }
-    /* Kategori rozetleri */
     .cat-badge {
         display: inline-block;
         padding: 0.35rem 0.75rem;
@@ -155,12 +90,10 @@ st.markdown("""
         font-weight: 600;
         font-size: 0.85rem;
     }
-    /* Mobil: yazı boyutları */
     @media (max-width: 640px) {
         .main .block-container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
         .welcome-title { font-size: 1.2rem; }
         .welcome-note { font-size: 0.9rem; }
-        div[data-testid="column"] { flex: 1 1 100% !important; }
     }
 </style>
 """, unsafe_allow_html=True)
