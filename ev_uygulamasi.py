@@ -36,7 +36,6 @@ st.markdown("""
     }
     section[data-testid="stSidebar"] { overflow-x: hidden !important; }
     div[data-testid="stHorizontalBlock"] {
-        flex-wrap: wrap !important;
         gap: 0.5rem !important;
         max-width: 100% !important;
     }
@@ -90,10 +89,35 @@ st.markdown("""
         font-weight: 600;
         font-size: 0.85rem;
     }
+    /* Mobil: silme butonu aynı satırda kalsın, taşma olmasın */
     @media (max-width: 640px) {
         .main .block-container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
         .welcome-title { font-size: 1.2rem; }
         .welcome-note { font-size: 0.9rem; }
+        /* Sadece 2 sütunlu satırlar (içerik + silme): alt satıra inmesin */
+        div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(2):last-child) {
+            flex-wrap: nowrap !important;
+            max-width: 100% !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(2):last-child) > div[data-testid="column"]:first-child {
+            min-width: 0 !important;
+            overflow: hidden !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(2):last-child) > div[data-testid="column"]:last-child {
+            flex-shrink: 0 !important;
+            min-width: 2.5rem !important;
+        }
+        /* Uzun metin ... ile kısalsın, taşma yapmasın */
+        div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(2):last-child) .stCheckbox label,
+        div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(2):last-child) [data-testid="stMarkdown"] p {
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+        /* Diğer çok sütunlu bloklar (form vb.) gerekirse alta geçebilsin */
+        div[data-testid="stHorizontalBlock"]:not(:has(> div[data-testid="column"]:nth-child(2):last-child)) {
+            flex-wrap: wrap !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
