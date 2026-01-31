@@ -23,42 +23,145 @@ NTFY_TOPIC = "yunus_ozel_ev_kanali_123"
 
 st.set_page_config(page_title="Bizim Evin Paneli", page_icon="🏡", layout="centered")
 
-# --- CSS ---
+# --- CSS: Mobil uyumlu + modern tema ---
 st.markdown("""
 <style>
-    div[data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 5px !important; }
-    div[data-testid="column"] { display: flex; align-items: center; height: 100%; }
-    button { padding: 0.25rem 0.5rem !important; }
-    
-    /* Karşılama Kutusu */
+    /* ========== MOBİL: Taşmayı engelle ========== */
+    html, body, #root, [data-testid="stAppViewContainer"] {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        position: relative;
+    }
+    .main .block-container {
+        max-width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 1rem !important;
+    }
+    section[data-testid="stSidebar"] { overflow-x: hidden !important; max-width: 100% !important; }
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+        max-width: 100% !important;
+    }
+    div[data-testid="column"] {
+        display: flex; align-items: center; height: 100%;
+        min-width: 0 !important;  /* Flex çocuklarının taşmasını engeller */
+        max-width: 100% !important;
+    }
+    /* Form elemanları mobilde taşmasın */
+    input, select, textarea, [data-testid="stSelectbox"] > div, .stTextInput > div input {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    /* Tablolar ve geniş içerik: sadece içerik kayar, sayfa değil */
+    .stDataFrame, .stTable, [data-testid="stExpander"] {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100% !important;
+    }
+    /* Metrik ve geniş bloklar */
+    [data-testid="stMetric"], [data-testid="column"] > div {
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    button {
+        padding: 0.35rem 0.6rem !important;
+        max-width: 100% !important;
+        font-size: 0.9rem !important;
+    }
+
+    /* ========== TEMA: Sıcak & modern ========== */
+    :root {
+        --ana-mor: #6366f1;
+        --ana-acik: #818cf8;
+        --arka-plan: #faf8f5;
+        --kart-golge: 0 2px 12px rgba(99, 102, 241, 0.08);
+        --kart-kenar: 12px;
+    }
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(160deg, #f0f4ff 0%, #faf8f5 50%, #fff8f0 100%) !important;
+    }
+    .main {
+        background: transparent !important;
+    }
+    /* Başlıklar */
+    h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        color: #1e1b4b !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.02em;
+    }
+    /* Karşılama kutuları */
     .welcome-box {
-        background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
-        color: #2c3e50; padding: 15px; border-radius: 15px;
-        text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+        color: #fff !important;
+        padding: 1.25rem 1rem;
+        border-radius: 16px;
+        text-align: center;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
+        border: none;
     }
     .prenses-box {
-        background: linear-gradient(120deg, #fccb90 0%, #d57eeb 100%);
-        color: #4a235a; padding: 15px; border-radius: 15px;
-        text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        border: 2px solid #fff;
+        background: linear-gradient(135deg, #f59e0b 0%, #d946ef 50%, #a855f7 100%);
+        color: #fff !important;
+        padding: 1.25rem 1rem;
+        border-radius: 16px;
+        text-align: center;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 8px 24px rgba(217, 70, 239, 0.25);
+        border: 2px solid rgba(255,255,255,0.3);
     }
-    .welcome-title { font-size: 22px; font-weight: bold; margin-bottom: 5px; }
-    .welcome-note { font-size: 15px; font-style: italic; }
-    
-    /* Kategori Rozetleri */
-    .cat-badge {
-        display: inline-block; padding: 4px 12px; border-radius: 12px;
-        color: white; font-weight: bold; font-size: 14px; margin-bottom: 5px;
+    .welcome-title { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .welcome-note { font-size: 0.95rem; opacity: 0.95; }
+    /* Expander / kartlar */
+    [data-testid="stExpander"] {
+        background: rgba(255,255,255,0.85);
+        border-radius: var(--kart-kenar);
+        box-shadow: var(--kart-golge);
+        border: 1px solid rgba(99, 102, 241, 0.12);
     }
-    .streamlit-expanderHeader { font-weight: bold; color: #333; font-size: 16px; }
-    
-    /* Sidebar linkler */
+    .streamlit-expanderHeader { font-weight: 600; color: #1e1b4b !important; font-size: 1rem; }
+    /* Sidebar */
+    section[data-testid="stSidebar"] > div {
+        background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%) !important;
+        border-right: 1px solid rgba(99, 102, 241, 0.1);
+    }
     .link-box {
-        display: block; padding: 8px 12px; margin: 4px 0; border-radius: 8px;
-        background: rgba(102, 126, 234, 0.15); color: #4a69bd; text-decoration: none;
-        font-weight: 500; transition: background 0.2s;
+        display: block;
+        padding: 0.6rem 0.75rem;
+        margin: 0.35rem 0;
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.12);
+        color: #4338ca !important;
+        text-decoration: none;
+        font-weight: 500;
+        transition: background 0.2s, transform 0.15s;
     }
-    .link-box:hover { background: rgba(102, 126, 234, 0.25); color: #2c3e50; }
+    .link-box:hover { background: rgba(99, 102, 241, 0.2); color: #3730a3 !important; }
+    /* Butonlar */
+    .stButton > button {
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        transition: transform 0.15s, box-shadow 0.15s !important;
+    }
+    .stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important; }
+    /* Kategori rozetleri */
+    .cat-badge {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        color: white;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    /* Mobil: yazı boyutları */
+    @media (max-width: 640px) {
+        .main .block-container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+        .welcome-title { font-size: 1.2rem; }
+        .welcome-note { font-size: 0.9rem; }
+        div[data-testid="column"] { flex: 1 1 100% !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
